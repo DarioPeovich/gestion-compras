@@ -1,0 +1,336 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model compras_articulos_cache {
+  hfsql_articulos_id   Int      @id
+  articulo_codigo      String   @db.VarChar(20)
+  descripcion          String   @db.VarChar(150)
+  precio_costo         Decimal? @db.Decimal(19, 6)
+  utilidad_lista_1     Decimal? @db.Decimal(6, 2)
+  utilidad_lista_2     Decimal? @db.Decimal(6, 2)
+  utilidad_lista_3     Decimal? @db.Decimal(6, 2)
+  utilidad_lista_4     Decimal? @db.Decimal(6, 2)
+  utilidad_lista_5     Decimal? @db.Decimal(6, 2)
+  alicuota_iva         Decimal? @db.Decimal(5, 2)
+  imp_interno_tipo     Int?
+  imp_interno_alicuota Decimal? @db.Decimal(6, 2)
+  imp_interno_monto    Decimal? @db.Decimal(19, 6)
+  imp_transf_comb      Decimal? @db.Decimal(19, 6)
+  imp_dioxido_carbono  Decimal? @db.Decimal(19, 6)
+  updated_at_hfsql     DateTime @db.Timestamp(6)
+  extra                Json?
+  synced_at            DateTime @default(now()) @db.Timestamp(6)
+
+  @@index([articulo_codigo], map: "idx_compras_articulos_cache_codigo")
+  @@index([descripcion], map: "idx_compras_articulos_cache_descrip")
+  @@index([updated_at_hfsql], map: "idx_compras_articulos_cache_updated")
+}
+
+model compras_cc_aplicaciones {
+  id                                                                         Int                 @id @default(autoincrement())
+  proveedor_id                                                               Int
+  pago_id                                                                    Int?
+  nota_credito_id                                                            Int?
+  factura_id                                                                 Int?
+  nota_debito_id                                                             Int?
+  importe                                                                    Decimal             @db.Decimal(19, 6)
+  fecha                                                                      DateTime            @default(dbgenerated("CURRENT_DATE")) @db.Date
+  usuario_id                                                                 Int
+  created_at                                                                 DateTime            @default(now()) @db.Timestamp(6)
+  compras_facturas                                                           compras_facturas?   @relation(fields: [factura_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_notas_cd_compras_cc_aplicaciones_nota_credito_idTocompras_notas_cd compras_notas_cd?   @relation("compras_cc_aplicaciones_nota_credito_idTocompras_notas_cd", fields: [nota_credito_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_notas_cd_compras_cc_aplicaciones_nota_debito_idTocompras_notas_cd  compras_notas_cd?   @relation("compras_cc_aplicaciones_nota_debito_idTocompras_notas_cd", fields: [nota_debito_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_pagos                                                              compras_pagos?      @relation(fields: [pago_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_proveedores                                                        compras_proveedores @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([factura_id], map: "idx_compras_cc_aplic_factura")
+  @@index([nota_credito_id], map: "idx_compras_cc_aplic_nota_credito")
+  @@index([nota_debito_id], map: "idx_compras_cc_aplic_nota_debito")
+  @@index([pago_id], map: "idx_compras_cc_aplic_pago")
+  @@index([proveedor_id], map: "idx_compras_cc_aplic_proveedor")
+}
+
+model compras_cc_movimientos {
+  id                  Int                 @id @default(autoincrement())
+  proveedor_id        Int
+  factura_id          Int?
+  nota_id             Int?
+  pago_id             Int?
+  tipo                String              @db.VarChar(30)
+  fecha               DateTime            @db.Date
+  debito              Decimal             @default(0) @db.Decimal(19, 6)
+  credito             Decimal             @default(0) @db.Decimal(19, 6)
+  saldo_acumulado     Decimal             @db.Decimal(19, 6)
+  descripcion         String?             @db.VarChar(200)
+  created_at          DateTime            @default(now()) @db.Timestamp(6)
+  compras_facturas    compras_facturas?   @relation(fields: [factura_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_notas_cd    compras_notas_cd?   @relation(fields: [nota_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_pagos       compras_pagos?      @relation(fields: [pago_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_proveedores compras_proveedores @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([factura_id], map: "idx_compras_cc_mov_factura")
+  @@index([fecha], map: "idx_compras_cc_mov_fecha")
+  @@index([nota_id], map: "idx_compras_cc_mov_nota")
+  @@index([pago_id], map: "idx_compras_cc_mov_pago")
+  @@index([proveedor_id], map: "idx_compras_cc_mov_proveedor")
+  @@index([proveedor_id, id(sort: Desc)], map: "idx_compras_cc_mov_proveedor_id_desc")
+  @@index([tipo], map: "idx_compras_cc_mov_tipo")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model compras_comprobantes_tipo {
+  id               Int                @id
+  comprob_afip_id  Int?
+  descripcion      String             @db.VarChar(50)
+  descrip_abrev    String             @db.VarChar(10)
+  letra            String?            @db.VarChar(2)
+  factor           Int                @db.SmallInt
+  cbte_fiscal      Boolean            @default(true)
+  compras_facturas compras_facturas[]
+  compras_notas_cd compras_notas_cd[]
+}
+
+model compras_facturas {
+  id                        Int                        @id @default(autoincrement())
+  proveedor_id              Int
+  comprobante_tipo_id       Int
+  punto_venta               Int
+  nro_factura               Int
+  fecha                     DateTime                   @default(dbgenerated("CURRENT_DATE")) @db.Date
+  fecha_vto                 DateTime?                  @db.Date
+  subtotal                  Decimal                    @default(0) @db.Decimal(19, 6)
+  total                     Decimal                    @default(0) @db.Decimal(19, 6)
+  saldo                     Decimal                    @default(0) @db.Decimal(19, 6)
+  impuestos                 Json?
+  estado                    String                     @default("CONFIRMADO") @db.VarChar(20)
+  stock_actualizado         Boolean                    @default(false)
+  observaciones             String?
+  usuario_id                Int
+  created_at                DateTime                   @default(now()) @db.Timestamp(6)
+  updated_at                DateTime                   @default(now()) @db.Timestamp(6)
+  compras_cc_aplicaciones   compras_cc_aplicaciones[]
+  compras_cc_movimientos    compras_cc_movimientos[]
+  compras_comprobantes_tipo compras_comprobantes_tipo  @relation(fields: [comprobante_tipo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_proveedores       compras_proveedores        @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_facturas_detalle  compras_facturas_detalle[]
+  compras_notas_cd          compras_notas_cd[]
+  compras_remitos_facturas  compras_remitos_facturas[]
+
+  @@unique([proveedor_id, comprobante_tipo_id, punto_venta, nro_factura])
+  @@index([estado], map: "idx_compras_facturas_estado")
+  @@index([fecha_vto], map: "idx_compras_facturas_fecha_vto")
+  @@index([proveedor_id], map: "idx_compras_facturas_proveedor")
+  @@index([saldo], map: "idx_compras_facturas_saldo")
+}
+
+model compras_facturas_detalle {
+  id                 Int              @id @default(autoincrement())
+  factura_id         Int
+  hfsql_articulos_id Int
+  articulo_codigo    String           @db.VarChar(20)
+  articulo_descrip   String           @db.VarChar(100)
+  cantidad           Decimal          @db.Decimal(14, 3)
+  precio_costo       Decimal          @db.Decimal(19, 6)
+  impuestos_linea    Json?
+  created_at         DateTime         @default(now()) @db.Timestamp(6)
+  compras_facturas   compras_facturas @relation(fields: [factura_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([factura_id], map: "idx_compras_facturas_detalle_factura")
+}
+
+model compras_notas_cd {
+  id                                                                                Int                        @id @default(autoincrement())
+  proveedor_id                                                                      Int
+  comprobante_tipo_id                                                               Int
+  factura_id                                                                        Int?
+  punto_venta                                                                       Int
+  nro_comprobante                                                                   Int
+  fecha                                                                             DateTime                   @default(dbgenerated("CURRENT_DATE")) @db.Date
+  importe                                                                           Decimal                    @db.Decimal(19, 6)
+  saldo                                                                             Decimal                    @default(0) @db.Decimal(19, 6)
+  motivo                                                                            String?                    @db.VarChar(200)
+  impuestos                                                                         Json?
+  stock_ajustado                                                                    Boolean                    @default(false)
+  estado                                                                            String                     @default("CONFIRMADO") @db.VarChar(20)
+  observaciones                                                                     String?
+  usuario_id                                                                        Int
+  created_at                                                                        DateTime                   @default(now()) @db.Timestamp(6)
+  updated_at                                                                        DateTime                   @default(now()) @db.Timestamp(6)
+  compras_cc_aplicaciones_compras_cc_aplicaciones_nota_credito_idTocompras_notas_cd compras_cc_aplicaciones[]  @relation("compras_cc_aplicaciones_nota_credito_idTocompras_notas_cd")
+  compras_cc_aplicaciones_compras_cc_aplicaciones_nota_debito_idTocompras_notas_cd  compras_cc_aplicaciones[]  @relation("compras_cc_aplicaciones_nota_debito_idTocompras_notas_cd")
+  compras_cc_movimientos                                                            compras_cc_movimientos[]
+  compras_comprobantes_tipo                                                         compras_comprobantes_tipo  @relation(fields: [comprobante_tipo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_facturas                                                                  compras_facturas?          @relation(fields: [factura_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_proveedores                                                               compras_proveedores        @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_notas_cd_detalle                                                          compras_notas_cd_detalle[]
+
+  @@unique([proveedor_id, comprobante_tipo_id, punto_venta, nro_comprobante])
+  @@index([factura_id], map: "idx_compras_notas_cd_factura")
+  @@index([proveedor_id], map: "idx_compras_notas_cd_proveedor")
+  @@index([saldo], map: "idx_compras_notas_cd_saldo")
+  @@index([comprobante_tipo_id], map: "idx_compras_notas_cd_tipo")
+}
+
+model compras_notas_cd_detalle {
+  id                 Int              @id @default(autoincrement())
+  nota_id            Int
+  hfsql_articulos_id Int?
+  articulo_codigo    String?          @db.VarChar(20)
+  articulo_descrip   String?          @db.VarChar(100)
+  cantidad           Decimal?         @db.Decimal(14, 3)
+  precio_costo       Decimal?         @db.Decimal(19, 6)
+  importe_linea      Decimal          @db.Decimal(19, 6)
+  created_at         DateTime         @default(now()) @db.Timestamp(6)
+  compras_notas_cd   compras_notas_cd @relation(fields: [nota_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([nota_id], map: "idx_compras_notas_cd_detalle_nota")
+}
+
+model compras_ordenes_compra {
+  id                             Int                              @id @default(autoincrement())
+  proveedor_id                   Int
+  fecha                          DateTime                         @default(dbgenerated("CURRENT_DATE")) @db.Date
+  fecha_entrega                  DateTime?                        @db.Date
+  estado                         String                           @default("BORRADOR") @db.VarChar(20)
+  observaciones                  String?
+  usuario_id                     Int
+  created_at                     DateTime                         @default(now()) @db.Timestamp(6)
+  updated_at                     DateTime                         @default(now()) @db.Timestamp(6)
+  compras_proveedores            compras_proveedores              @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_ordenes_compra_detalle compras_ordenes_compra_detalle[]
+  compras_remitos                compras_remitos[]
+
+  @@index([estado], map: "idx_compras_oc_estado")
+  @@index([proveedor_id], map: "idx_compras_oc_proveedor")
+}
+
+model compras_ordenes_compra_detalle {
+  id                     Int                    @id @default(autoincrement())
+  orden_compra_id        Int
+  hfsql_articulos_id     Int
+  articulo_codigo        String                 @db.VarChar(20)
+  articulo_descrip       String                 @db.VarChar(100)
+  cantidad               Decimal                @db.Decimal(14, 3)
+  precio_unitario        Decimal?               @db.Decimal(19, 6)
+  created_at             DateTime               @default(now()) @db.Timestamp(6)
+  compras_ordenes_compra compras_ordenes_compra @relation(fields: [orden_compra_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([orden_compra_id], map: "idx_compras_ocd_orden")
+}
+
+model compras_pagos {
+  id                      Int                       @id @default(autoincrement())
+  proveedor_id            Int
+  fecha                   DateTime                  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  importe_total           Decimal                   @db.Decimal(19, 6)
+  saldo                   Decimal                   @default(0) @db.Decimal(19, 6)
+  observaciones           String?
+  usuario_id              Int
+  created_at              DateTime                  @default(now()) @db.Timestamp(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamp(6)
+  compras_cc_aplicaciones compras_cc_aplicaciones[]
+  compras_cc_movimientos  compras_cc_movimientos[]
+  compras_proveedores     compras_proveedores       @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_pagos_medios    compras_pagos_medios[]
+
+  @@index([fecha], map: "idx_compras_pagos_fecha")
+  @@index([proveedor_id], map: "idx_compras_pagos_proveedor")
+  @@index([saldo], map: "idx_compras_pagos_saldo")
+}
+
+model compras_pagos_medios {
+  id            Int           @id @default(autoincrement())
+  pago_id       Int
+  medio         String        @db.VarChar(20)
+  importe       Decimal       @db.Decimal(19, 6)
+  referencia    String?       @db.VarChar(100)
+  created_at    DateTime      @default(now()) @db.Timestamp(6)
+  compras_pagos compras_pagos @relation(fields: [pago_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([pago_id], map: "idx_compras_pagos_medios_pago")
+}
+
+model compras_proveedores {
+  id                      Int                       @id @default(autoincrement())
+  hfsql_proveedores_id    Int?                      @unique
+  razon_social            String                    @db.VarChar(150)
+  cuit                    String?                   @db.VarChar(20)
+  articulo_codigo         String?                   @unique @db.VarChar(20)
+  condicion_pago          String?                   @db.VarChar(50)
+  dias_pago               Int?                      @default(0)
+  email                   String?                   @db.VarChar(100)
+  telefono                String?                   @db.VarChar(30)
+  direccion               String?                   @db.VarChar(200)
+  contactos               Json?
+  activo                  Boolean                   @default(true)
+  updated_at_hfsql        DateTime?                 @db.Timestamp(6)
+  created_at              DateTime                  @default(now()) @db.Timestamp(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamp(6)
+  compras_cc_aplicaciones compras_cc_aplicaciones[]
+  compras_cc_movimientos  compras_cc_movimientos[]
+  compras_facturas        compras_facturas[]
+  compras_notas_cd        compras_notas_cd[]
+  compras_ordenes_compra  compras_ordenes_compra[]
+  compras_pagos           compras_pagos[]
+  compras_remitos         compras_remitos[]
+
+  @@index([activo], map: "idx_compras_proveedores_activo")
+  @@index([cuit], map: "idx_compras_proveedores_cuit")
+  @@index([hfsql_proveedores_id], map: "idx_compras_proveedores_hfsql")
+}
+
+model compras_remitos {
+  id                       Int                        @id @default(autoincrement())
+  proveedor_id             Int
+  orden_compra_id          Int?
+  nro_remito               String                     @db.VarChar(20)
+  fecha                    DateTime                   @default(dbgenerated("CURRENT_DATE")) @db.Date
+  deposito_id              Int
+  estado                   String                     @default("CONFIRMADO") @db.VarChar(20)
+  stock_actualizado        Boolean                    @default(false)
+  observaciones            String?
+  usuario_id               Int
+  created_at               DateTime                   @default(now()) @db.Timestamp(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamp(6)
+  compras_ordenes_compra   compras_ordenes_compra?    @relation(fields: [orden_compra_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_proveedores      compras_proveedores        @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_remitos_detalle  compras_remitos_detalle[]
+  compras_remitos_facturas compras_remitos_facturas[]
+
+  @@index([estado], map: "idx_compras_remitos_estado")
+  @@index([fecha], map: "idx_compras_remitos_fecha")
+  @@index([proveedor_id], map: "idx_compras_remitos_proveedor")
+}
+
+model compras_remitos_detalle {
+  id                 Int             @id @default(autoincrement())
+  remito_id          Int
+  hfsql_articulos_id Int
+  articulo_codigo    String          @db.VarChar(20)
+  articulo_descrip   String          @db.VarChar(100)
+  cantidad           Decimal         @db.Decimal(14, 3)
+  precio_costo       Decimal?        @db.Decimal(19, 6)
+  created_at         DateTime        @default(now()) @db.Timestamp(6)
+  compras_remitos    compras_remitos @relation(fields: [remito_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([remito_id], map: "idx_compras_remitos_detalle_remito")
+}
+
+model compras_remitos_facturas {
+  id               Int              @id @default(autoincrement())
+  remito_id        Int
+  factura_id       Int
+  created_at       DateTime         @default(now()) @db.Timestamp(6)
+  compras_facturas compras_facturas @relation(fields: [factura_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  compras_remitos  compras_remitos  @relation(fields: [remito_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([remito_id, factura_id])
+  @@index([factura_id], map: "idx_compras_remitos_facturas_factura")
+  @@index([remito_id], map: "idx_compras_remitos_facturas_remito")
+}

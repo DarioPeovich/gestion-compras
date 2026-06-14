@@ -1,0 +1,95 @@
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import ProveedoresList from '../components/proveedores/ProveedoresList.jsx'
+
+function Layout({ children }) {
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <header className="bg-blue-600 text-white px-6 py-4 shadow">
+        <h1 className="text-xl font-bold">Puma Pris — Módulo de Compras</h1>
+      </header>
+
+      <nav className="bg-white border-b border-gray-200 px-6">
+        <div className="flex gap-6">
+          <NavLink
+            to="/proveedores"
+            className={({ isActive }) =>
+              `py-3 text-sm font-medium border-b-2 ${
+                isActive
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`
+            }
+          >
+            Proveedores
+          </NavLink>
+          <NavLink
+            to="/facturas"
+            className={({ isActive }) =>
+              `py-3 text-sm font-medium border-b-2 ${
+                isActive
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`
+            }
+          >
+            Facturas
+          </NavLink>
+          <NavLink
+            to="/comprobantes"
+            className={({ isActive }) =>
+              `py-3 text-sm font-medium border-b-2 ${
+                isActive
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`
+            }
+          >
+            Comprobantes
+          </NavLink>
+        </div>
+      </nav>
+
+      <main className="p-6">
+        {children}
+      </main>
+    </div>
+  )
+}
+
+export default function AppRouter() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={
+          <Layout>
+            <p className="text-gray-500">Seleccioná una sección del menú.</p>
+          </Layout>
+        } />
+        <Route path="/proveedores" element={
+          <Layout>
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-700">Proveedores</h2>
+              </div>
+              <ProveedoresList />
+            </div>
+          </Layout>
+        } />
+        <Route path="/facturas" element={
+          <Layout>
+            <div className="bg-white rounded-lg shadow p-6">
+              <p className="text-gray-500">Módulo de Facturas — próximamente.</p>
+            </div>
+          </Layout>
+        } />
+        <Route path="/comprobantes" element={
+          <Layout>
+            <div className="bg-white rounded-lg shadow p-6">
+              <p className="text-gray-500">Módulo de Comprobantes — próximamente.</p>
+            </div>
+          </Layout>
+        } />
+      </Routes>
+    </BrowserRouter>
+  )
+}
