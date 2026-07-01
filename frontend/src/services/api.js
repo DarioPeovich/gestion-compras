@@ -36,4 +36,16 @@ export const proveedoresService = {
     const data = await res.json()
     return data.data
   }
+  
+}
+
+export const syncService = {
+  sincronizarProveedores: async () => {
+    const res = await fetch(`${API_URL}/sync/proveedores`, {
+      method: 'POST'
+    })
+    if (!res.ok) throw new Error('Error al sincronizar proveedores')
+    const data = await res.json()
+    return data
+  }
 }

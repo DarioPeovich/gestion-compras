@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import ProveedoresList from '../components/proveedores/ProveedoresList.jsx'
+import ArticulosList from '../components/articulos/ArticulosList.jsx'
+import NuevoComprobante from '../components/comprobantes/NuevoComprobante.jsx'
 
 function Layout({ children }) {
   return (
@@ -23,7 +26,7 @@ function Layout({ children }) {
             Proveedores
           </NavLink>
           <NavLink
-            to="/facturas"
+            to="/articulos"
             className={({ isActive }) =>
               `py-3 text-sm font-medium border-b-2 ${
                 isActive
@@ -32,7 +35,7 @@ function Layout({ children }) {
               }`
             }
           >
-            Facturas
+            Artículos
           </NavLink>
           <NavLink
             to="/comprobantes"
@@ -56,6 +59,31 @@ function Layout({ children }) {
   )
 }
 
+function ComprobantesPage() {
+  const [modo, setModo] = useState('lista')
+
+  if (modo === 'nuevo') {
+    return <NuevoComprobante onCancelar={() => setModo('lista')} />
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow">
+      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <h2 className="text-lg font-semibold text-gray-700">Comprobantes</h2>
+        <button
+          onClick={() => setModo('nuevo')}
+          className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"
+        >
+          + Nuevo comprobante
+        </button>
+      </div>
+      <div className="p-6">
+        <p className="text-gray-500 text-sm">No hay comprobantes registrados todavía.</p>
+      </div>
+    </div>
+  )
+}
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -75,18 +103,19 @@ export default function AppRouter() {
             </div>
           </Layout>
         } />
-        <Route path="/facturas" element={
+        <Route path="/articulos" element={
           <Layout>
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-gray-500">Módulo de Facturas — próximamente.</p>
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-700">Catálogo de Artículos</h2>
+              </div>
+              <ArticulosList />
             </div>
           </Layout>
         } />
         <Route path="/comprobantes" element={
           <Layout>
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-gray-500">Módulo de Comprobantes — próximamente.</p>
-            </div>
+            <ComprobantesPage />
           </Layout>
         } />
       </Routes>
