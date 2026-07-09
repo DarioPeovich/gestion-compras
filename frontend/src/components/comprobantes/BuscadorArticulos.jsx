@@ -19,9 +19,11 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
         url = `${API_URL}/articulos/por-codigo-barras/${proveedorId}/${encodeURIComponent(texto)}`;
       if (modo === "codProveedor")
         url = `${API_URL}/articulos/por-proveedor/${proveedorId}/${encodeURIComponent(texto)}`;
+      if (modo === "codSes")
+        url = `${API_URL}/articulos/por-id/${proveedorId}/${encodeURIComponent(texto)}`;
       const res = await fetch(url);
       const data = await res.json();
-      const lista = data.data || [];
+      const lista = Array.isArray(data.data) ? data.data : data.data ? [data.data] : [];
       if (lista.length === 1) {
         onSeleccionar(lista[0]);
         setTexto("");
@@ -43,9 +45,10 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
           }}
           className="border border-gray-300 rounded px-2 py-2 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
-          <option value="descripcion">DescripciÃ³n</option>
-          <option value="codBarras">CÃ³d. barras</option>
-          <option value="codProveedor">CÃ³d. proveedor</option>
+          <option value="descripcion">Descripción</option>
+          <option value="codBarras">Cód. barras</option>
+          <option value="codProveedor">Cód. proveedor</option>
+          <option value="codSes">Cod. SES</option>
         </select>
         <input
           type="text"
@@ -55,7 +58,7 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
             if (!e.target.value) setResultados([]);
           }}
           onKeyDown={(e) => e.key === "Enter" && buscar()}
-          placeholder="Buscar artÃ­culo..."
+          placeholder="Buscar artículo..."
           className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
           autoFocus
         />
