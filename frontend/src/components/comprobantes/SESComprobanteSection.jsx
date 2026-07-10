@@ -75,14 +75,6 @@ export default function SESComprobanteSection({
           </SESField>
         )}
 
-        {tiposFiltrados.length === 1 && tipoId !== String(tiposFiltrados[0].id) && (
-          <div className="hidden">
-            {(() => {
-              setTipoId(String(tiposFiltrados[0].id));
-              return null;
-            })()}
-          </div>
-        )}
       </SESFormRow>
 
       {(tipoId || tiposFiltrados.length === 1) && (

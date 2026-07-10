@@ -14,11 +14,12 @@ import SESResumenSection from "./SESResumenSection.jsx";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
 const CATEGORIAS = {
-  Factura: (t) => t.descrip_abrev.startsWith("Fac"),
-  "Nota de Débito": (t) => t.descrip_abrev.startsWith("ND") && t.cbte_fiscal,
-  "Nota de Crédito": (t) => t.descrip_abrev.startsWith("NC") && t.cbte_fiscal,
-  Remito: (t) => t.descrip_abrev === "REM",
-  "Nota Interna": (t) => !t.cbte_fiscal && t.descrip_abrev !== "REM",
+  Factura: (t) => t.descrip_abrev.startsWith("FacCmp_"),
+  "Nota de Crédito": (t) => t.descrip_abrev.startsWith("NCCmp_"),
+  "Nota de Débito": (t) => t.descrip_abrev.startsWith("NDCmp_"),
+  Remito: (t) => t.descrip_abrev === "RtoCmp",
+  "Nota de Débito Interna": (t) => t.descrip_abrev === "NDInt_Cmp",
+  "Nota de Crédito Interna": (t) => t.descrip_abrev === "NCInt_Cmp",
 };
 
 const CON_ITEMS = ["Factura", "Nota de Crédito", "Remito"];
@@ -199,6 +200,13 @@ export default function NuevoComprobante({ onCancelar }) {
   );
   const tipoSeleccionado = tiposTodos.find((t) => t.id === Number(tipoId));
   const llevaItems = CON_ITEMS.includes(categoria);
+
+  useEffect(() => {
+    if (tiposFiltrados.length === 1) {
+      const unicoTipoId = String(tiposFiltrados[0].id);
+      if (tipoId !== unicoTipoId) setTipoId(unicoTipoId);
+    }
+  }, [tiposFiltrados, tipoId]);
 
   const tieneICL = items.some((i) => toNum(i.icl_unit) > 0);
   const tieneIDC = items.some((i) => toNum(i.idc_unit) > 0);
