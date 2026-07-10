@@ -6,6 +6,7 @@ import SESWorkspace from "../ui/layout/SESWorkspace";
 import SESSection from "../ui/layout/SESSection";
 import SESFormRow from "../ui/forms/SESFormRow";
 import SESComprobanteSection from "./SESComprobanteSection.jsx";
+import SESFooterActions from "./SESFooterActions.jsx";
 import SESItemsSection from "./SESItemsSection.jsx";
 import SESProveedorSection from "./SESProveedorSection.jsx";
 import SESResumenSection from "./SESResumenSection.jsx";
@@ -804,6 +805,7 @@ export default function NuevoComprobante({ onCancelar }) {
             cargandoDepositos={cargandoDepositos}
             handleConfirmar={handleConfirmar}
             cargando={cargando}
+            onCancelar={onCancelar}
           />
         )}
 
@@ -816,13 +818,11 @@ export default function NuevoComprobante({ onCancelar }) {
               $ {fmt3(toNum(importeTotal))}
             </span>
           </div>
-          <button
-            onClick={handleConfirmar}
-            disabled={cargando}
-            className="bg-blue-600 text-white px-6 py-2 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
-            {cargando ? "Guardando..." : "Confirmar comprobante"}
-          </button>
+          <SESFooterActions
+            onCancelar={onCancelar}
+            handleConfirmar={handleConfirmar}
+            cargando={cargando}
+          />
         </div>
       )}
     </SESWorkspace>

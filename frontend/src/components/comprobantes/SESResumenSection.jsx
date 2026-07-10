@@ -1,9 +1,8 @@
 import { Calculator } from "lucide-react";
 
 import SESSection from "../ui/layout/SESSection";
-import SESButton from "../ui/actions/SESButton";
 import SESCheckbox from "../ui/forms/SESCheckbox";
-import SESActionBar from "../ui/layout/SESActionBar";
+import SESFooterActions from "./SESFooterActions.jsx";
 
 export default function SESResumenSection({
   modoIngreso,
@@ -44,6 +43,7 @@ export default function SESResumenSection({
   cargandoDepositos,
   handleConfirmar,
   cargando,
+  onCancelar,
 }) {
   return (
     <SESSection
@@ -373,15 +373,11 @@ export default function SESResumenSection({
               </div>
             )}
 
-            <SESActionBar align="end">
-              <SESButton
-                variant="primary"
-                onClick={handleConfirmar}
-                disabled={cargando}
-              >
-                {cargando ? "Guardando..." : "Confirmar comprobante"}
-              </SESButton>
-            </SESActionBar>
+            <SESFooterActions
+              onCancelar={onCancelar}
+              handleConfirmar={handleConfirmar}
+              cargando={cargando}
+            />
           </div>
         </div>
       </div>
