@@ -80,7 +80,6 @@ model compras_comprobantes {
   numero_comprobante                    Int
   fecha                                 DateTime                                @db.Date
   fecha_vto                             DateTime?                               @db.Date
-  periodo_fiscal                        String?                                 @db.VarChar(7)
   subtotal                              Decimal                                 @default(0) @db.Decimal(14, 2)
   total                                 Decimal                                 @default(0) @db.Decimal(14, 2)
   saldo                                 Decimal                                 @default(0) @db.Decimal(14, 2)
@@ -90,6 +89,7 @@ model compras_comprobantes {
   usuario_id                            Int
   created_at                            DateTime                                @default(now()) @db.Timestamptz(6)
   updated_at                            DateTime                                @default(now()) @db.Timestamptz(6)
+  periodo_fiscal                        String?                                 @db.VarChar(7)
   compras_cc_movimientos                compras_cc_movimientos[]
   compras_comprobantes_tipo             compras_comprobantes_tipo               @relation(fields: [comprobante_tipo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   compras_proveedores                   compras_proveedores                     @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -150,7 +150,6 @@ model compras_remitos {
   id                        Int                         @id @default(autoincrement())
   proveedor_id              Int
   orden_compra_id           Int?
-  nro_remito                String                      @db.VarChar(20)
   fecha                     DateTime                    @default(dbgenerated("CURRENT_DATE")) @db.Date
   deposito_id               Int
   estado                    String                      @default("CONFIRMADO") @db.VarChar(20)
@@ -159,11 +158,14 @@ model compras_remitos {
   usuario_id                Int
   created_at                DateTime                    @default(now()) @db.Timestamp(6)
   updated_at                DateTime                    @default(now()) @db.Timestamp(6)
+  punto_venta               Int
+  numero_remito             Int
   compras_ordenes_compra    compras_ordenes_compra?     @relation(fields: [orden_compra_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   compras_proveedores       compras_proveedores         @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   compras_remitos_asociados compras_remitos_asociados[]
   compras_remitos_detalle   compras_remitos_detalle[]
 
+  @@unique([proveedor_id, punto_venta, numero_remito], map: "uq_compras_remitos_numeracion")
   @@index([estado], map: "idx_compras_remitos_estado")
   @@index([fecha], map: "idx_compras_remitos_fecha")
   @@index([proveedor_id], map: "idx_compras_remitos_proveedor")
