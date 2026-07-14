@@ -1,5 +1,6 @@
-import { Calculator } from "lucide-react";
+import { Calculator, Trash2 } from "lucide-react";
 
+import SESIconButton from "../ui/actions/SESIconButton";
 import SESSection from "../ui/layout/SESSection";
 import SESCheckbox from "../ui/forms/SESCheckbox";
 import SESFooterActions from "./SESFooterActions.jsx";
@@ -135,12 +136,14 @@ export default function SESResumenSection({
                       </td>
                       {modoIngreso === "simplificado" && (
                         <td className="py-1 pl-1">
-                          <button
+                          <SESIconButton
+                            icon={Trash2}
+                            label="Eliminar alícuota de IVA"
+                            variant="danger"
+                            size="sm"
                             onClick={() => removeIvaFila(idx)}
-                            className="text-red-300 hover:text-red-500 text-sm leading-none"
-                          >
-                            ×
-                          </button>
+                            className="h-6 w-6 rounded-md"
+                          />
                         </td>
                       )}
                     </tr>

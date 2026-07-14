@@ -1,9 +1,10 @@
-import { Package } from "lucide-react";
+import { Package, Trash2 } from "lucide-react";
 
 import SESSection from "../ui/layout/SESSection";
 import SESToolbar from "../ui/layout/SESToolbar";
 import SESToggleGroup from "../ui/forms/SESToggleGroup";
 import SESButton from "../ui/actions/SESButton";
+import SESIconButton from "../ui/actions/SESIconButton";
 import SESCheckbox from "../ui/forms/SESCheckbox";
 import BuscadorArticulos from "./BuscadorArticulos.jsx";
 
@@ -28,6 +29,23 @@ export default function SESItemsSection({
   gridInputCls,
   fmt3,
 }) {
+  const columnasItems = [
+    "14ch",
+    "14ch",
+    "16ch",
+    "12ch",
+    "14ch",
+    mostrarICL && "14ch",
+    mostrarIDC && "14ch",
+    mostrarImpInt && "14ch",
+    "8ch",
+    "16ch",
+    "minmax(0, 1fr)",
+    "1.5rem",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <SESSection
       variant="premium"
@@ -106,8 +124,8 @@ export default function SESItemsSection({
             <ErrMsg campo="items" />
 
             {items.length > 0 && (
-              <div className="mt-3 overflow-x-auto border border-gray-200 rounded">
-                <div className="min-w-[980px] divide-y divide-gray-100">
+              <div className="mt-3 border border-gray-200 rounded">
+                <div className="divide-y divide-gray-100">
                   {items.map((item, idx) => {
                     const esManual = Number(item.hfsql_articulos_id) === -99;
                     const datosSecundarios = [
@@ -118,7 +136,7 @@ export default function SESItemsSection({
                     return (
                       <div
                         key={item._uid}
-                        className={`px-3 py-3 hover:bg-gray-50 ${esManual ? "bg-amber-50" : "bg-white"}`}
+                        className={`px-2 py-3 hover:bg-gray-50 ${esManual ? "bg-amber-50" : "bg-white"}`}
                       >
                         <div className="mb-2">
                           {esManual ? (
@@ -145,10 +163,12 @@ export default function SESItemsSection({
                           )}
                         </div>
 
-                        <div className="grid grid-cols-[minmax(0,1fr)_2rem] gap-2 items-end text-xs">
-                          <div className="flex items-end gap-2 min-w-max">
-                            <div className="w-16 shrink-0">
-                            <div className="mb-1 text-gray-500">Cant.</div>
+                        <div
+                          className="grid items-end gap-1 text-sm whitespace-nowrap"
+                          style={{ gridTemplateColumns: columnasItems }}
+                        >
+                          <div>
+                            <div className="mb-1 text-xs text-gray-500">Cant.</div>
                             <NumInput
                               value={item.cantidad}
                               onValueChange={(v) =>
@@ -158,15 +178,15 @@ export default function SESItemsSection({
                             />
                           </div>
 
-                          <div className="w-32 shrink-0">
-                            <div className="mb-1 text-gray-500 text-right">Costo act.</div>
-                            <div className="py-1 text-right text-gray-400">
+                          <div>
+                            <div className="mb-1 text-xs text-gray-500 text-right">Costo act.</div>
+                            <div className="py-1 text-sm text-right text-gray-400">
                               {esManual ? "—" : `$ ${fmt3(item.precio_costo_original)}`}
                             </div>
                           </div>
 
-                          <div className="w-32 shrink-0">
-                            <div className="mb-1 text-gray-500 text-right">Costo fact.</div>
+                          <div>
+                            <div className="mb-1 text-xs text-gray-500 text-right">Costo fact.</div>
                             <NumInput
                               value={item.precio_costo}
                               onValueChange={(v) =>
@@ -176,14 +196,14 @@ export default function SESItemsSection({
                             />
                           </div>
 
-                          <div className="w-28 shrink-0">
-                            <div className="mb-1 text-gray-500">Tipo IVA</div>
+                          <div>
+                            <div className="mb-1 text-xs text-gray-500">IVA %</div>
                             <select
                               value={String(item.iva_tipo_id || "")}
                               onChange={(e) =>
                                 updateItem(idx, "iva_tipo_id", e.target.value)
                               }
-                              className="w-full border border-gray-300 rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-full min-w-0 border border-gray-300 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                             >
                               {tiposIva.map((t) => (
                                 <option key={t.ivaTiposID} value={String(t.ivaTiposID)}>
@@ -193,18 +213,18 @@ export default function SESItemsSection({
                             </select>
                           </div>
 
-                          <div className="w-32 shrink-0">
-                            <div className="mb-1 text-gray-500 text-right">IVA</div>
-                            <div className="py-1 text-right text-gray-700">
+                          <div>
+                            <div className="mb-1 text-xs text-gray-500 text-right">IVA</div>
+                            <div className="py-1 text-sm text-right text-gray-700">
                               $ {fmt3(item.importe_iva)}
                             </div>
                           </div>
 
                           {mostrarICL && (
-                            <div className="w-32 shrink-0">
-                              <div className="mb-1 text-gray-500 text-right">ICL</div>
+                            <div>
+                              <div className="mb-1 text-xs text-gray-500 text-right">ICL (ITC)</div>
                               {esManual ? (
-                                <div className="py-1 text-center text-gray-300">—</div>
+                                <div className="py-1 text-sm text-center text-gray-300">—</div>
                               ) : (
                                 <NumInput
                                   value={item.icl_unit}
@@ -218,10 +238,10 @@ export default function SESItemsSection({
                           )}
 
                           {mostrarIDC && (
-                            <div className="w-32 shrink-0">
-                              <div className="mb-1 text-gray-500 text-right">IDC</div>
+                            <div>
+                              <div className="mb-1 text-xs text-gray-500 text-right">IDC</div>
                               {esManual ? (
-                                <div className="py-1 text-center text-gray-300">—</div>
+                                <div className="py-1 text-sm text-center text-gray-300">—</div>
                               ) : (
                                 <NumInput
                                   value={item.idc_unit}
@@ -235,16 +255,16 @@ export default function SESItemsSection({
                           )}
 
                           {mostrarImpInt && (
-                            <div className="w-32 shrink-0">
-                              <div className="mb-1 text-gray-500 text-right">Imp.Int.</div>
-                              <div className="py-1 text-right text-gray-700">
+                            <div>
+                              <div className="mb-1 text-xs text-gray-500 text-right">Imp.Int.</div>
+                              <div className="py-1 text-sm text-right text-gray-700">
                                 {esManual ? "—" : `$ ${fmt3(item.importe_imp_interno)}`}
                               </div>
                             </div>
                           )}
 
-                          <div className="w-24 shrink-0">
-                            <div className="mb-1 text-gray-500 text-center">Actualiz.Precio</div>
+                          <div>
+                            <div className="mb-1 text-xs text-gray-500 text-center">Act.Precio</div>
                             <div className="py-1 text-center">
                               {esManual ? (
                                 <span className="text-gray-300">—</span>
@@ -259,25 +279,27 @@ export default function SESItemsSection({
                             </div>
                           </div>
 
-                          <div className="w-36 shrink-0">
-                            <div className="mb-1 text-gray-500 text-right">Importe</div>
-                            <div className="py-1 text-right text-gray-700 font-medium">
+                          <div>
+                            <div className="mb-1 text-xs text-gray-500 text-right">Importe</div>
+                            <div className="py-1 text-sm text-right text-gray-700 font-medium">
                               $ {fmt3(item.importe_linea)}
                             </div>
                           </div>
 
-                          </div>
+                          <div aria-hidden="true" />
 
-                          <div className="w-8 justify-self-end">
+                          <div className="w-6 justify-self-end text-center">
                             <div className="mb-1 text-transparent">.</div>
-                            <button
+                            <SESIconButton
+                              icon={Trash2}
+                              label="Eliminar ítem"
+                              variant="danger"
+                              size="sm"
                               onClick={() =>
                                 setItems((prev) => prev.filter((_, i) => i !== idx))
                               }
-                              className="text-red-400 hover:text-red-600 text-lg leading-none"
-                            >
-                              ×
-                            </button>
+                              className="h-6 w-6 rounded-md"
+                            />
                           </div>
                         </div>
                       </div>

@@ -148,6 +148,7 @@ model compras_comprobantes_tributos_detalle {
 
 model compras_remitos {
   id                        Int                         @id @default(autoincrement())
+  operacion_id              String?                     @unique @db.Uuid
   proveedor_id              Int
   orden_compra_id           Int?
   fecha                     DateTime                    @default(dbgenerated("CURRENT_DATE")) @db.Date

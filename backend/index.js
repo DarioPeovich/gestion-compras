@@ -3,6 +3,7 @@ import cors from 'cors'
 import proveedoresRouter from './src/routes/proveedores.routes.js'
 import articulosRouter from './src/routes/articulos.routes.js'
 import comprobantesRouter from './src/routes/comprobantes.routes.js'
+import remitosRouter from './src/routes/remitos.routes.js'
 import sucursalesRoutes from './src/routes/sucursales.routes.js'
 import ivaTiposRouter from './src/routes/iva-tipos.routes.js'
 import syncRouter from './src/routes/sync.routes.js'
@@ -25,6 +26,7 @@ app.use('/api/sync', syncRouter)
 app.use('/api/test', testRouter)
 app.use('/api/articulos', articulosRouter)
 app.use('/api/comprobantes', comprobantesRouter)
+app.use('/api/remitos', remitosRouter)
 app.use('/api/sucursales', sucursalesRoutes)
 app.use('/api/iva-tipos', ivaTiposRouter)
 

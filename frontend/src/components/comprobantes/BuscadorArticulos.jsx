@@ -7,10 +7,12 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
   const [texto, setTexto] = useState("");
   const [resultados, setResultados] = useState([]);
   const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
 
   const buscar = async () => {
     if (!texto.trim()) return;
     setBuscando(true);
+    setErrorBusqueda("");
     try {
       let url;
       if (modo === "descripcion")
@@ -23,12 +25,20 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
         url = `${API_URL}/articulos/por-id/${proveedorId}/${encodeURIComponent(texto)}`;
       const res = await fetch(url);
       const data = await res.json();
+      if (!res.ok) throw new Error("Error al buscar artículos");
       const lista = Array.isArray(data.data) ? data.data : data.data ? [data.data] : [];
       if (lista.length === 1) {
         onSeleccionar(lista[0]);
         setTexto("");
         setResultados([]);
-      } else setResultados(lista);
+        setErrorBusqueda("");
+      } else {
+        setResultados(lista);
+        setErrorBusqueda(lista.length === 0 ? "No se encontraron artículos" : "");
+      }
+    } catch {
+      setResultados([]);
+      setErrorBusqueda("No se pudo realizar la búsqueda");
     } finally {
       setBuscando(false);
     }
@@ -42,6 +52,7 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
           onChange={(e) => {
             setModo(e.target.value);
             setResultados([]);
+            setErrorBusqueda("");
           }}
           className="border border-gray-300 rounded px-2 py-2 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
@@ -55,11 +66,16 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
           value={texto}
           onChange={(e) => {
             setTexto(e.target.value);
+            setErrorBusqueda("");
             if (!e.target.value) setResultados([]);
           }}
           onKeyDown={(e) => e.key === "Enter" && buscar()}
           placeholder="Buscar artículo..."
-          className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className={`flex-1 border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+            errorBusqueda
+              ? "border-red-400 focus:ring-red-400"
+              : "border-gray-300 focus:ring-blue-500"
+          }`}
           autoFocus
         />
         <button
@@ -70,6 +86,9 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
           {buscando ? "..." : "Buscar"}
         </button>
       </div>
+      {errorBusqueda && (
+        <p className="mt-1 text-xs text-red-500">{errorBusqueda}</p>
+      )}
       {resultados.length > 0 && (
         <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-64 overflow-y-auto">
           {resultados.map((a) => (
@@ -79,6 +98,7 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
                 onSeleccionar(a);
                 setTexto("");
                 setResultados([]);
+                setErrorBusqueda("");
               }}
               className="w-full text-left px-4 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-0"
             >
