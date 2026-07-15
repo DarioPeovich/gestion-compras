@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
@@ -8,6 +9,66 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
   const [resultados, setResultados] = useState([]);
   const [buscando, setBuscando] = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState("");
+  const [dropdownPos, setDropdownPos] = useState(null);
+  const buscadorRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const dropdownAbierto = resultados.length > 0;
+
+  const actualizarPosicion = useCallback(() => {
+    const elemento = buscadorRef.current;
+    if (!elemento) return;
+
+    const rect = elemento.getBoundingClientRect();
+    const margen = 4;
+    const margenViewport = 8;
+    const espacioAbajo = window.innerHeight - rect.bottom - margenViewport;
+    const espacioArriba = rect.top - margenViewport;
+    const abrirArriba = espacioAbajo < 180 && espacioArriba > espacioAbajo;
+    const maxHeight = Math.min(
+      320,
+      Math.max(160, abrirArriba ? espacioArriba - margen : espacioAbajo - margen)
+    );
+
+    setDropdownPos({
+      left: rect.left,
+      top: abrirArriba ? Math.max(margenViewport, rect.top - maxHeight - margen) : rect.bottom + margen,
+      width: rect.width,
+      maxHeight,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (dropdownAbierto) actualizarPosicion();
+  }, [dropdownAbierto, actualizarPosicion]);
+
+  useEffect(() => {
+    if (!dropdownAbierto) return;
+
+    const cerrarSiClickFuera = (event) => {
+      if (
+        !buscadorRef.current?.contains(event.target) &&
+        !dropdownRef.current?.contains(event.target)
+      ) {
+        setResultados([]);
+      }
+    };
+    const cerrarConEscape = (event) => {
+      if (event.key === "Escape") setResultados([]);
+    };
+
+    window.addEventListener("resize", actualizarPosicion);
+    window.addEventListener("scroll", actualizarPosicion, true);
+    document.addEventListener("mousedown", cerrarSiClickFuera);
+    document.addEventListener("keydown", cerrarConEscape);
+
+    return () => {
+      window.removeEventListener("resize", actualizarPosicion);
+      window.removeEventListener("scroll", actualizarPosicion, true);
+      document.removeEventListener("mousedown", cerrarSiClickFuera);
+      document.removeEventListener("keydown", cerrarConEscape);
+    };
+  }, [dropdownAbierto, actualizarPosicion]);
 
   const buscar = async () => {
     if (!texto.trim()) return;
@@ -45,7 +106,7 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
   };
 
   return (
-    <div className="relative">
+    <div ref={buscadorRef} className="relative">
       <div className="flex gap-2">
         <select
           value={modo}
@@ -89,8 +150,17 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
       {errorBusqueda && (
         <p className="mt-1 text-xs text-red-500">{errorBusqueda}</p>
       )}
-      {resultados.length > 0 && (
-        <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-64 overflow-y-auto">
+      {dropdownAbierto && dropdownPos && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[1000] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl"
+          style={{
+            left: dropdownPos.left,
+            top: dropdownPos.top,
+            width: dropdownPos.width,
+            maxHeight: dropdownPos.maxHeight,
+          }}
+        >
           {resultados.map((a) => (
             <button
               key={a.articulos_id}
@@ -115,7 +185,8 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
               </div>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

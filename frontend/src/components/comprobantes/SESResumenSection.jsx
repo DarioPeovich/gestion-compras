@@ -45,7 +45,74 @@ export default function SESResumenSection({
   handleConfirmar,
   cargando,
   onCancelar,
+  esRemito,
 }) {
+  if (esRemito) {
+    return (
+      <SESSection
+        variant="premium"
+        title="Recepción"
+        subtitle="Sucursal, depósito y actualización obligatoria de stock"
+        icon={Calculator}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Sucursal
+            </label>
+            <select
+              value={sucursalId}
+              onChange={(e) => setSucursalId(e.target.value)}
+              className={`w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 ${errores.sucursalId ? "border-red-400 focus:ring-red-300" : "border-gray-300 focus:ring-blue-500"}`}
+            >
+              <option value="">— Sucursal —</option>
+              {sucursales.map((s) => (
+                <option key={s.sucursalesID} value={s.sucursalesID}>
+                  {s.nombreSucursal}
+                </option>
+              ))}
+            </select>
+            <ErrMsg campo="sucursalId" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Depósito
+            </label>
+            <select
+              value={depositoId}
+              onChange={(e) => setDepositoId(e.target.value)}
+              disabled={!sucursalId || cargandoDepositos}
+              className={`w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:bg-gray-100 disabled:text-gray-400 ${errores.depositoId ? "border-red-400 focus:ring-red-300" : "border-gray-300 focus:ring-blue-500"}`}
+            >
+              <option value="">
+                {cargandoDepositos ? "Cargando..." : "— Depósito —"}
+              </option>
+              {depositos.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nombre}
+                </option>
+              ))}
+            </select>
+            <ErrMsg campo="depositoId" />
+          </div>
+        </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          La actualización de stock es obligatoria para registrar el remito.
+        </p>
+        <ErrMsg campo="items" />
+
+        <SESFooterActions
+          onCancelar={onCancelar}
+          handleConfirmar={handleConfirmar}
+          cargando={cargando}
+          confirmarLabel="Confirmar remito"
+        />
+      </SESSection>
+    );
+  }
+
   return (
     <SESSection
       variant="premium"

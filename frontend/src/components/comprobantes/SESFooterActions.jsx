@@ -5,6 +5,7 @@ export default function SESFooterActions({
   onCancelar,
   handleConfirmar,
   cargando,
+  confirmarLabel = "Confirmar comprobante",
 }) {
   const handleCancelar = () => {
     if (
@@ -22,7 +23,7 @@ export default function SESFooterActions({
         Cancelar
       </SESButton>
       <SESButton variant="primary" onClick={handleConfirmar} disabled={cargando}>
-        {cargando ? "Guardando..." : "Confirmar comprobante"}
+        {cargando ? "Guardando..." : confirmarLabel}
       </SESButton>
     </SESActionBar>
   );

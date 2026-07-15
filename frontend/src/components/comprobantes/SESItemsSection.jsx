@@ -28,8 +28,11 @@ export default function SESItemsSection({
   NumInput,
   gridInputCls,
   fmt3,
+  esRemito,
 }) {
-  const columnasItems = [
+  const columnasItems = (esRemito
+    ? ["14ch", "16ch", "minmax(0, 1fr)", "1.5rem"]
+    : [
     "14ch",
     "14ch",
     "16ch",
@@ -42,7 +45,7 @@ export default function SESItemsSection({
     "16ch",
     "minmax(0, 1fr)",
     "1.5rem",
-  ]
+  ])
     .filter(Boolean)
     .join(" ");
 
@@ -50,11 +53,11 @@ export default function SESItemsSection({
     <SESSection
       variant="premium"
       title="Ítems"
-      subtitle="Artículos, cantidades, costos e impuestos"
+      subtitle={esRemito ? "Artículos, cantidades y costos" : "Artículos, cantidades, costos e impuestos"}
       icon={Package}
     >
       <>
-        <SESToolbar>
+        {!esRemito && <SESToolbar>
           <SESToggleGroup
             value={modoIngreso}
             onChange={handleCambiarModo}
@@ -63,7 +66,7 @@ export default function SESItemsSection({
               { value: "simplificado", label: "Simplificado" },
             ]}
           />
-        </SESToolbar>
+        </SESToolbar>}
 
         {modoIngreso === "detallado" && (
           <>
@@ -87,10 +90,22 @@ export default function SESItemsSection({
                     articulo.codSES ??
                     articulo.articulos_id ??
                     null,
+                  articulo_codigo:
+                    articulo.cod_ses ??
+                    articulo.codigo_ses ??
+                    articulo.codigoSES ??
+                    articulo.codSES ??
+                    articulo.cod_proveedor ??
+                    articulo.codigo_proveedor ??
+                    articulo.codigoProveedor ??
+                    articulo.codProveedor ??
+                    articulo.cod_barras ??
+                    null,
                   cantidad: 1,
                   precio_costo_original: articulo.precio_costo,
-                  precio_costo:
-                    articulo.precio_costo_proveedor || articulo.precio_costo || 0,
+                  precio_costo: esRemito
+                    ? articulo.precio_costo_proveedor ?? articulo.precio_costo ?? null
+                    : articulo.precio_costo_proveedor || articulo.precio_costo || 0,
                   actualizar_costo: true,
                   iva_tipo_id: String(
                     articulo.IvaTiposID ??
@@ -112,7 +127,7 @@ export default function SESItemsSection({
                 setErrores((prev) => ({ ...prev, items: undefined }));
               }}
             />
-            <SESToolbar className="pt-3 pb-2">
+            {!esRemito && <SESToolbar className="pt-3 pb-2">
               <SESButton
                 variant="secondary"
                 size="sm"
@@ -120,7 +135,7 @@ export default function SESItemsSection({
               >
                 Agregar concepto manual
               </SESButton>
-            </SESToolbar>
+            </SESToolbar>}
             <ErrMsg campo="items" />
 
             {items.length > 0 && (
@@ -178,15 +193,17 @@ export default function SESItemsSection({
                             />
                           </div>
 
-                          <div>
+                          {!esRemito && <div>
                             <div className="mb-1 text-xs text-gray-500 text-right">Costo act.</div>
                             <div className="py-1 text-sm text-right text-gray-400">
                               {esManual ? "—" : `$ ${fmt3(item.precio_costo_original)}`}
                             </div>
-                          </div>
+                          </div>}
 
                           <div>
-                            <div className="mb-1 text-xs text-gray-500 text-right">Costo fact.</div>
+                            <div className="mb-1 text-xs text-gray-500 text-right">
+                              {esRemito ? "Costo" : "Costo fact."}
+                            </div>
                             <NumInput
                               value={item.precio_costo}
                               onValueChange={(v) =>
@@ -196,7 +213,7 @@ export default function SESItemsSection({
                             />
                           </div>
 
-                          <div>
+                          {!esRemito && <div>
                             <div className="mb-1 text-xs text-gray-500">IVA %</div>
                             <select
                               value={String(item.iva_tipo_id || "")}
@@ -211,16 +228,16 @@ export default function SESItemsSection({
                                 </option>
                               ))}
                             </select>
-                          </div>
+                          </div>}
 
-                          <div>
+                          {!esRemito && <div>
                             <div className="mb-1 text-xs text-gray-500 text-right">IVA</div>
                             <div className="py-1 text-sm text-right text-gray-700">
                               $ {fmt3(item.importe_iva)}
                             </div>
-                          </div>
+                          </div>}
 
-                          {mostrarICL && (
+                          {!esRemito && mostrarICL && (
                             <div>
                               <div className="mb-1 text-xs text-gray-500 text-right">ICL (ITC)</div>
                               {esManual ? (
@@ -237,7 +254,7 @@ export default function SESItemsSection({
                             </div>
                           )}
 
-                          {mostrarIDC && (
+                          {!esRemito && mostrarIDC && (
                             <div>
                               <div className="mb-1 text-xs text-gray-500 text-right">IDC</div>
                               {esManual ? (
@@ -254,7 +271,7 @@ export default function SESItemsSection({
                             </div>
                           )}
 
-                          {mostrarImpInt && (
+                          {!esRemito && mostrarImpInt && (
                             <div>
                               <div className="mb-1 text-xs text-gray-500 text-right">Imp.Int.</div>
                               <div className="py-1 text-sm text-right text-gray-700">
@@ -263,7 +280,7 @@ export default function SESItemsSection({
                             </div>
                           )}
 
-                          <div>
+                          {!esRemito && <div>
                             <div className="mb-1 text-xs text-gray-500 text-center">Act.Precio</div>
                             <div className="py-1 text-center">
                               {esManual ? (
@@ -277,14 +294,14 @@ export default function SESItemsSection({
                                 />
                               )}
                             </div>
-                          </div>
+                          </div>}
 
-                          <div>
+                          {!esRemito && <div>
                             <div className="mb-1 text-xs text-gray-500 text-right">Importe</div>
                             <div className="py-1 text-sm text-right text-gray-700 font-medium">
                               $ {fmt3(item.importe_linea)}
                             </div>
-                          </div>
+                          </div>}
 
                           <div aria-hidden="true" />
 

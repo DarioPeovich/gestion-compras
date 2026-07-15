@@ -73,6 +73,17 @@ const toNum = (v) => {
   return isFinite(n) ? n : 0;
 };
 
+const resolverCodigoArticulo = (item) => {
+  const candidatos = [
+    item.articulo_codigo,
+    item.cod_ses,
+    item.cod_proveedor,
+    item.cod_barras,
+  ];
+  const codigo = candidatos.find((valor) => String(valor ?? "").trim());
+  return codigo == null ? "" : String(codigo).trim();
+};
+
 // ─── Cálculo de línea ─────────────────────────────────────────────────────────
 const calcularImportesLinea = (item) => {
   const cant = toNum(item.cantidad);
@@ -200,6 +211,7 @@ export default function NuevoComprobante({ onCancelar }) {
   );
   const tipoSeleccionado = tiposTodos.find((t) => t.id === Number(tipoId));
   const llevaItems = CON_ITEMS.includes(categoria);
+  const esRemito = categoria === "Remito";
 
   useEffect(() => {
     if (tiposFiltrados.length === 1) {
@@ -290,12 +302,12 @@ export default function NuevoComprobante({ onCancelar }) {
   }, []);
 
   useEffect(() => {
-    if (!actualizarStock || sucursales.length > 0) return;
+    if ((!esRemito && !actualizarStock) || sucursales.length > 0) return;
     fetch(`${API_URL}/sucursales`)
       .then((r) => r.json())
       .then((d) => setSucursales(d.data || []))
       .catch(() => {});
-  }, [actualizarStock]);
+  }, [actualizarStock, esRemito, sucursales.length]);
 
   useEffect(() => {
     if (!sucursalId) {
@@ -329,7 +341,8 @@ export default function NuevoComprobante({ onCancelar }) {
   };
 
   const handleCategoriaChange = (e) => {
-    setCategoria(e.target.value);
+    const nuevaCategoria = e.target.value;
+    setCategoria(nuevaCategoria);
     setTipoId("");
     setModoIngreso("detallado");
     resetForm();
@@ -474,6 +487,43 @@ export default function NuevoComprobante({ onCancelar }) {
       }
     }
 
+    if (esRemito) {
+      if (!Number.isInteger(Number(proveedorId)) || Number(proveedorId) <= 0) {
+        errs.proveedorId = "Seleccioná un proveedor válido";
+      }
+      if (!Number.isInteger(Number(puntoVenta)) || Number(puntoVenta) <= 0) {
+        errs.puntoVenta = "Ingresá un punto de venta válido";
+      }
+      if (!Number.isInteger(Number(nroComprobante)) || Number(nroComprobante) <= 0) {
+        errs.nroComprobante = "Ingresá un número de remito válido";
+      }
+      if (!Number.isInteger(Number(sucursalId)) || Number(sucursalId) <= 0) {
+        errs.sucursalId = "Seleccioná la sucursal";
+      }
+      if (!Number.isInteger(Number(depositoId)) || Number(depositoId) <= 0) {
+        errs.depositoId = "Seleccioná el depósito";
+      }
+      if (items.length === 0) {
+        errs.items = "Agregá al menos un artículo";
+      } else {
+        const itemInvalido = items.find(
+          (item) =>
+            !Number.isInteger(Number(item.hfsql_articulos_id)) ||
+            Number(item.hfsql_articulos_id) <= 0 ||
+            !(toNum(item.cantidad) > 0) ||
+            !resolverCodigoArticulo(item) ||
+            !String(item.descripcion || "").trim()
+        );
+        if (itemInvalido) {
+          errs.items =
+            "Todos los artículos deben tener código, descripción y cantidad mayor a cero";
+        }
+      }
+
+      setErrores(errs);
+      return Object.keys(errs).length === 0;
+    }
+
     if (categoria === "Factura") {
       if (!fechaVto) {
         errs.fechaVto = "Ingresá la fecha de vencimiento";
@@ -553,6 +603,62 @@ export default function NuevoComprobante({ onCancelar }) {
     if (!(await validar())) return;
     setCargando(true);
     try {
+      if (esRemito) {
+        const bodyRemito = {
+          proveedor_id: Number(proveedorId),
+          punto_venta: Number(puntoVenta),
+          numero_remito: Number(nroComprobante),
+          fecha,
+          deposito_id: Number(depositoId),
+          sucursal_id: Number(sucursalId),
+          observaciones: motivo || null,
+          usuario_id: 1,
+          usuario_nombre: "Operador",
+          actualizar_stock: true,
+          items: items.map((item) => ({
+            hfsql_articulos_id: Number(item.hfsql_articulos_id),
+            articulo_codigo: resolverCodigoArticulo(item),
+            articulo_descrip: String(item.descripcion).trim(),
+            cantidad: toNum(item.cantidad),
+            precio_costo:
+              item.precio_costo == null || item.precio_costo === ""
+                ? null
+                : toNum(item.precio_costo),
+          })),
+        };
+
+        const res = await fetch(`${API_URL}/remitos/registrar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyRemito),
+        });
+        const textoRespuesta = await res.text();
+        let data;
+        try {
+          data = textoRespuesta ? JSON.parse(textoRespuesta) : null;
+        } catch {
+          alert(
+            `El servidor respondió HTTP ${res.status} con un cuerpo no válido para registrar el remito`
+          );
+          return;
+        }
+
+        if (!res.ok || !data?.ok || !data?.data?.id) {
+          const mensaje =
+            data?.detalle || data?.error || `No se pudo registrar el remito (HTTP ${res.status})`;
+          const operacionId = data?.operacionID || data?.data?.operacionID;
+          alert(operacionId ? `${mensaje}\nOperación: ${operacionId}` : mensaje);
+          return;
+        }
+
+        const operacionId = data.data.operacionID || data.operacionID;
+        alert(
+          `Remito #${data.data.id} registrado${operacionId ? `\nOperación: ${operacionId}` : ""}`
+        );
+        onCancelar();
+        return;
+      }
+
       let subtotal, total, itemsBody, percepcionesBody, ivaDetalleBody;
 
       if (llevaItems && modoIngreso === "detallado") {
@@ -704,6 +810,7 @@ export default function NuevoComprobante({ onCancelar }) {
           setFechaVto={setFechaVto}
           periodoFiscal={periodoFiscal}
           generarOpcionesPeriodo={generarOpcionesPeriodo}
+          esRemito={esRemito}
         />
 
         {(tipoId || tiposFiltrados.length === 1) && (
@@ -741,6 +848,7 @@ export default function NuevoComprobante({ onCancelar }) {
           NumInput={NumInput}
           gridInputCls={gridInputCls}
           fmt3={fmt3}
+          esRemito={esRemito}
         />
       )}
       {/* ── ZONA 3B — Nota Interna / ND ────────────────────────────────────── */}
@@ -771,9 +879,9 @@ export default function NuevoComprobante({ onCancelar }) {
       )}
 
       {/* ── ZONA 4 — Pie ───────────────────────────────────────────────────── */}
-      {proveedorId &&
-        llevaItems &&
-        (items.length > 0 || modoIngreso === "simplificado") && (
+      {llevaItems &&
+        ((esRemito && categoria) ||
+          (proveedorId && (items.length > 0 || modoIngreso === "simplificado"))) && (
           <SESResumenSection
             modoIngreso={modoIngreso}
             addIvaFila={addIvaFila}
@@ -814,6 +922,7 @@ export default function NuevoComprobante({ onCancelar }) {
             handleConfirmar={handleConfirmar}
             cargando={cargando}
             onCancelar={onCancelar}
+            esRemito={esRemito}
           />
         )}
 

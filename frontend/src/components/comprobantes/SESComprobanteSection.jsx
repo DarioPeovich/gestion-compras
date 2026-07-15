@@ -27,6 +27,7 @@ export default function SESComprobanteSection({
   setFechaVto,
   periodoFiscal,
   generarOpcionesPeriodo,
+  esRemito,
 }) {
   return (
     <>
@@ -79,7 +80,7 @@ export default function SESComprobanteSection({
 
       {(tipoId || tiposFiltrados.length === 1) && (
         <SESFormRow>
-          {tipoSeleccionado?.cbte_fiscal && (
+          {(tipoSeleccionado?.cbte_fiscal || esRemito) && (
             <>
               <SESField
                 label="Punto de venta"
@@ -98,7 +99,11 @@ export default function SESComprobanteSection({
                 <ErrMsg campo="puntoVenta" />
               </SESField>
 
-              <SESField label="Número" required className="col-span-12 md:col-span-3">
+              <SESField
+                label={esRemito ? "Número de remito" : "Número"}
+                required
+                className="col-span-12 md:col-span-3"
+              >
                 <SESInput
                   value={nroComprobante}
                   onChange={(e) => setNroComprobante(e.target.value.replace(/\D/g, ""))}
@@ -127,7 +132,7 @@ export default function SESComprobanteSection({
                 }));
                 if (tipoSeleccionado?.cbte_fiscal) {
                   setPeriodoFiscal(resolverPeriodoFiscal(v));
-                } else if (v) {
+                } else if (v && !esRemito) {
                   const [yyyy, mm] = v.split("-");
                   setPeriodoFiscal(`${mm}/${yyyy}`);
                 }
