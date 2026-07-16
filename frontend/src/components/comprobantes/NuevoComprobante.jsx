@@ -571,8 +571,7 @@ export default function NuevoComprobante({ onCancelar }) {
   };
 
   // ── Validación ────────────────────────────────────────────────────────────────
-  const validar = async () => {
-    const errs = {};
+  const validarCamposComunes = (errs) => {
     if (!tipoId) errs.tipoId = "Seleccioná el tipo de comprobante";
     if (!proveedorId) errs.proveedorId = "Seleccioná el proveedor";
 
@@ -589,6 +588,37 @@ export default function NuevoComprobante({ onCancelar }) {
         errs.fecha = "La fecha de emisión no puede ser futura";
       }
     }
+
+  };
+
+  const validarFactura = (errs) => {
+    if (categoria === "Factura") {
+      if (!fechaVto) {
+        errs.fechaVto = "Ingresá la fecha de vencimiento";
+      } else {
+        const fVto = new Date(fechaVto + "T00:00:00");
+        const fEmision = new Date(fecha + "T00:00:00");
+        if (isNaN(fVto.getTime())) {
+          errs.fechaVto = "Fecha de vencimiento inválida";
+        } else if (fecha && !isNaN(fEmision.getTime()) && fVto < fEmision) {
+          errs.fechaVto = "La fecha de vencimiento no puede ser menor a la de emisión";
+        }
+      }
+    }
+  };
+
+  const validarDatosFiscales = (errs) => {
+    if (tipoSeleccionado?.cbte_fiscal) {
+      if (!periodoFiscal) errs.periodoFiscal = "Seleccioná el período fiscal";
+      if (!puntoVenta) errs.puntoVenta = "Ingresá el punto de venta";
+      if (!nroComprobante) errs.nroComprobante = "Ingresá el número de comprobante";
+    }
+  };
+
+  const validar = async () => {
+    const errs = {};
+
+    validarCamposComunes(errs);
 
     if (esRemito) {
       if (!Number.isInteger(Number(proveedorId)) || Number(proveedorId) <= 0) {
@@ -627,25 +657,9 @@ export default function NuevoComprobante({ onCancelar }) {
       return Object.keys(errs).length === 0;
     }
 
-    if (categoria === "Factura") {
-      if (!fechaVto) {
-        errs.fechaVto = "Ingresá la fecha de vencimiento";
-      } else {
-        const fVto = new Date(fechaVto + "T00:00:00");
-        const fEmision = new Date(fecha + "T00:00:00");
-        if (isNaN(fVto.getTime())) {
-          errs.fechaVto = "Fecha de vencimiento inválida";
-        } else if (fecha && !isNaN(fEmision.getTime()) && fVto < fEmision) {
-          errs.fechaVto = "La fecha de vencimiento no puede ser menor a la de emisión";
-        }
-      }
-    }
+    validarFactura(errs);
 
-    if (tipoSeleccionado?.cbte_fiscal) {
-      if (!periodoFiscal) errs.periodoFiscal = "Seleccioná el período fiscal";
-      if (!puntoVenta) errs.puntoVenta = "Ingresá el punto de venta";
-      if (!nroComprobante) errs.nroComprobante = "Ingresá el número de comprobante";
-    }
+    validarDatosFiscales(errs);
 
     // ── Validación duplicados ──────────────────────────────────────────────
     if (
