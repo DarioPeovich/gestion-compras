@@ -9,7 +9,7 @@
 > Documento vivo. Describe la arquitectura de integración entre el
 > backend Node.js y el ERP WinDev.
 
-------------------------------------------------------------------------
+---
 
 # 1. Objetivo
 
@@ -20,27 +20,31 @@ ERP SES.
 Node.js coordina las operaciones del módulo Compras y delega en WinDev
 aquellas funciones cuya lógica de negocio pertenece al sistema legado.
 
-------------------------------------------------------------------------
+---
 
 # 2. Responsabilidades
 
-  -----------------------------------------------------------------------
-  Sistema                    Responsabilidad
-  -------------------------- --------------------------------------------
-  React                      Interfaz de usuario
+---
 
-  Node.js                    Orquestación de procesos, persistencia
-                             PostgreSQL y coordinación
+Sistema Responsabilidad
 
-  PostgreSQL                 Información propia del módulo Compras
+---
 
-  WinDev                     Reglas operativas del ERP
+React Interfaz de usuario
 
-  HFSQL                      Fuente de verdad para stock, costos y
-                             maestros
-  -----------------------------------------------------------------------
+Node.js Orquestación de procesos, persistencia
+PostgreSQL y coordinación
 
-------------------------------------------------------------------------
+PostgreSQL Información propia del módulo Compras
+
+WinDev Reglas operativas del ERP
+
+HFSQL Fuente de verdad para stock, costos y
+maestros
+
+---
+
+---
 
 # 3. Principio fundamental
 
@@ -52,11 +56,11 @@ en HFSQL.
 Toda modificación de stock o costos se realiza exclusivamente mediante
 la API WinDev.
 
-------------------------------------------------------------------------
+---
 
 # 4. Flujo general
 
-``` text
+```text
 React
    │
    ▼
@@ -76,7 +80,7 @@ Node.js
 Node.js
 ```
 
-------------------------------------------------------------------------
+---
 
 # 5. Integración HTTP
 
@@ -84,13 +88,13 @@ La comunicación se realiza mediante JSON sobre HTTP.
 
 Actualmente los procesos principales son:
 
--   Actualización de stock.
--   Actualización de costos.
--   Sincronización de artículos.
--   Sincronización de proveedores.
--   Consulta de operaciones.
+- Actualización de stock.
+- Actualización de costos.
+- Sincronización de artículos.
+- Sincronización de proveedores.
+- Consulta de operaciones.
 
-------------------------------------------------------------------------
+---
 
 # 6. Protocolo de idempotencia
 
@@ -102,18 +106,18 @@ WinDev registra el estado en **apiOperacionesProcesadas**.
 
 Estados implementados:
 
--   RECIBIDA
--   PROCESANDO
--   APLICADA
--   ERROR
+- RECIBIDA
+- PROCESANDO
+- APLICADA
+- ERROR
 
-------------------------------------------------------------------------
+---
 
 # 7. Confirmación de operaciones
 
 El flujo normal es:
 
-``` text
+```text
 POST actualizar-stock
         │
         ▼
@@ -132,7 +136,7 @@ APLICADA / ERROR / PROCESANDO / NO_ENCONTRADA
 
 Node nunca supone éxito únicamente porque el POST fue enviado.
 
-------------------------------------------------------------------------
+---
 
 # 8. Transacciones
 
@@ -145,13 +149,13 @@ Las operaciones documentales utilizan transacciones Prisma
 
 Las operaciones sobre HFSQL utilizan:
 
--   HTransactionStart()
--   HTransactionEnd()
--   HTransactionCancel()
+- HTransactionStart()
+- HTransactionEnd()
+- HTransactionCancel()
 
 Cada actualización de stock constituye una única unidad atómica.
 
-------------------------------------------------------------------------
+---
 
 # 9. Compensación
 
@@ -164,7 +168,7 @@ Cuando Node no puede confirmar la actualización de stock:
     una compensación local;
 3.  el remito se elimina y la operación finaliza con error.
 
-------------------------------------------------------------------------
+---
 
 # 10. Errores funcionales
 
@@ -172,27 +176,27 @@ WinDev es responsable de las validaciones de negocio.
 
 Ejemplo:
 
-``` text
+```text
 No existe el artículo 999999999 informado en la posición 1
 ```
 
 Node preserva este mensaje y lo devuelve al frontend junto con el
 `operacionID`.
 
-------------------------------------------------------------------------
+---
 
 # 11. Casos validados
 
--   Operación exitosa.
--   API WinDev no configurada.
--   Error de conexión.
--   Timeout.
--   Artículo inexistente.
--   Idempotencia por reintento.
--   Rollback transaccional en WinDev.
--   Compensación en PostgreSQL.
+- Operación exitosa.
+- API WinDev no configurada.
+- Error de conexión.
+- Timeout.
+- Artículo inexistente.
+- Idempotencia por reintento.
+- Rollback transaccional en WinDev.
+- Compensación en PostgreSQL.
 
-------------------------------------------------------------------------
+---
 
 # 12. Evolución prevista
 
@@ -201,7 +205,95 @@ aplicada al flujo de Remitos.
 
 Las próximas etapas contemplan:
 
--   Extensión del protocolo a Facturas.
--   Extensión a Notas de Crédito y Débito.
--   Aplicación al resto de operaciones críticas.
--   Conciliación automática entre PostgreSQL y HFSQL.
+- Extensión del protocolo a Facturas.
+- Extensión a Notas de Crédito y Débito.
+- Aplicación al resto de operaciones críticas.
+- Conciliación automática entre PostgreSQL y HFSQL.
+
+# 13. Flujo específico de Remitos
+
+## Objetivo
+
+Registrar un Remito de Compra manteniendo consistencia entre PostgreSQL y WinDev.
+
+## Flujo
+
+React
+
+↓
+
+POST /api/remitos/registrar
+
+↓
+
+Persistencia PostgreSQL
+
+↓
+
+compras_remitos
+
+↓
+
+compras_remitos_detalle
+
+↓
+
+Generación de operacionID
+
+↓
+
+POST /stock/actualizar
+
+↓
+
+WinDev
+
+↓
+
+StockMov
+
+↓
+
+StockMov_Detalle
+
+↓
+
+apiOperacionesProcesadas
+
+↓
+
+Confirmación
+
+↓
+
+Respuesta al Frontend
+
+---
+
+## Validaciones
+
+Antes de invocar WinDev:
+
+- duplicado de remito
+- artículos válidos
+- cantidades válidas
+- depósito
+- sucursal
+
+Si alguna falla, no se realiza ninguna llamada a WinDev.
+
+---
+
+## Idempotencia
+
+Cada actualización de stock genera un UUID único.
+
+La operación queda registrada tanto en PostgreSQL como en WinDev.
+
+En caso de pérdida de respuesta HTTP puede consultarse posteriormente el estado mediante el endpoint de recuperación.
+
+---
+
+## Estado
+
+Implementado y validado funcionalmente.
