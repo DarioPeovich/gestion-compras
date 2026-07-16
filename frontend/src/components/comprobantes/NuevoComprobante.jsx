@@ -13,48 +13,106 @@ import SESResumenSection from "./SESResumenSection.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
-const CATEGORIAS = {
-  Factura: (t) => t.descrip_abrev.startsWith("FacCmp_"),
-  "Nota de Crédito": (t) => t.descrip_abrev.startsWith("NCCmp_"),
-  "Nota de Débito": (t) => t.descrip_abrev.startsWith("NDCmp_"),
-  Remito: (t) => t.descrip_abrev === "RtoCmp",
-  "Nota de Débito Interna": (t) => t.descrip_abrev === "NDInt_Cmp",
-  "Nota de Crédito Interna": (t) => t.descrip_abrev === "NCInt_Cmp",
-};
-
-const ENCABEZADO_INICIAL = {
-  title: "Nuevo comprobante",
-  subtitle: "Recepción y registración de comprobantes de compra",
-};
-
-const ENCABEZADOS_POR_CATEGORIA = {
+const CONFIG_CATEGORIAS = {
   Factura: {
-    title: "Nueva factura",
-    subtitle: "Recepción y registración de facturas de compra",
+    filtroTipo: (t) => t.descrip_abrev.startsWith("FacCmp_"),
+    llevaItems: true,
+    permiteSimplificado: true,
+    esRemito: false,
+    encabezado: {
+      title: "Nueva factura",
+      subtitle: "Recepción y registración de facturas de compra",
+    },
+    seccionDocumento: {
+      title: "Comprobante",
+      subtitle: "Tipo, proveedor, numeración, fechas y período fiscal",
+    },
   },
   "Nota de Crédito": {
-    title: "Nueva nota de crédito",
-    subtitle: "Registración de notas de crédito de proveedores",
+    filtroTipo: (t) => t.descrip_abrev.startsWith("NCCmp_"),
+    llevaItems: true,
+    permiteSimplificado: true,
+    esRemito: false,
+    encabezado: {
+      title: "Nueva nota de crédito",
+      subtitle: "Registración de notas de crédito de proveedores",
+    },
+    seccionDocumento: {
+      title: "Comprobante",
+      subtitle: "Tipo, proveedor, numeración, fechas y período fiscal",
+    },
   },
   "Nota de Débito": {
-    title: "Nueva nota de débito",
-    subtitle: "Registración de notas de débito de proveedores",
+    filtroTipo: (t) => t.descrip_abrev.startsWith("NDCmp_"),
+    llevaItems: false,
+    permiteSimplificado: false,
+    esRemito: false,
+    encabezado: {
+      title: "Nueva nota de débito",
+      subtitle: "Registración de notas de débito de proveedores",
+    },
+    seccionDocumento: {
+      title: "Comprobante",
+      subtitle: "Tipo, proveedor, numeración, fechas y período fiscal",
+    },
   },
   Remito: {
-    title: "Nuevo remito",
-    subtitle: "Recepción de mercadería y actualización de stock",
-  },
-  "Nota de Crédito Interna": {
-    title: "Nueva nota de crédito interna",
-    subtitle: "Registración de ajustes internos de crédito",
+    filtroTipo: (t) => t.descrip_abrev === "RtoCmp",
+    llevaItems: true,
+    permiteSimplificado: false,
+    esRemito: true,
+    encabezado: {
+      title: "Nuevo remito",
+      subtitle: "Recepción de mercadería y actualización de stock",
+    },
+    seccionDocumento: {
+      title: "Datos del remito",
+      subtitle: "Proveedor, numeración y fecha de emisión",
+    },
   },
   "Nota de Débito Interna": {
-    title: "Nueva nota de débito interna",
-    subtitle: "Registración de ajustes internos de débito",
+    filtroTipo: (t) => t.descrip_abrev === "NDInt_Cmp",
+    llevaItems: false,
+    permiteSimplificado: false,
+    esRemito: false,
+    encabezado: {
+      title: "Nueva nota de débito interna",
+      subtitle: "Registración de ajustes internos de débito",
+    },
+    seccionDocumento: {
+      title: "Comprobante",
+      subtitle: "Tipo, proveedor, numeración, fechas y período fiscal",
+    },
+  },
+  "Nota de Crédito Interna": {
+    filtroTipo: (t) => t.descrip_abrev === "NCInt_Cmp",
+    llevaItems: false,
+    permiteSimplificado: false,
+    esRemito: false,
+    encabezado: {
+      title: "Nueva nota de crédito interna",
+      subtitle: "Registración de ajustes internos de crédito",
+    },
+    seccionDocumento: {
+      title: "Comprobante",
+      subtitle: "Tipo, proveedor, numeración, fechas y período fiscal",
+    },
   },
 };
 
-const CON_ITEMS = ["Factura", "Nota de Crédito", "Remito"];
+const CONFIG_CATEGORIA_INICIAL = {
+  llevaItems: false,
+  permiteSimplificado: false,
+  esRemito: false,
+  encabezado: {
+    title: "Nuevo comprobante",
+    subtitle: "Recepción y registración de comprobantes de compra",
+  },
+  seccionDocumento: {
+    title: "Comprobante",
+    subtitle: "Tipo, proveedor, numeración, fechas y período fiscal",
+  },
+};
 
 // ─── Formateo display ─────────────────────────────────────────────────────────
 const fmt3 = (n) =>
@@ -238,13 +296,14 @@ export default function NuevoComprobante({ onCancelar }) {
   });
 
   // ── Derivados ────────────────────────────────────────────────────────────────
+  const configCategoria =
+    CONFIG_CATEGORIAS[categoria] ?? CONFIG_CATEGORIA_INICIAL;
   const tiposFiltrados = tiposTodos.filter(
-    (t) => categoria && CATEGORIAS[categoria]?.(t)
+    (t) => categoria && configCategoria.filtroTipo?.(t)
   );
   const tipoSeleccionado = tiposTodos.find((t) => t.id === Number(tipoId));
-  const llevaItems = CON_ITEMS.includes(categoria);
-  const esRemito = categoria === "Remito";
-  const esComprobanteFiscal = Boolean(tipoSeleccionado?.cbte_fiscal);
+  const llevaItems = configCategoria.llevaItems;
+  const esRemito = configCategoria.esRemito;
   const usaIngresoDetallado = modoIngreso === "detallado";
   const usaIngresoSimplificado = modoIngreso === "simplificado";
   const muestraFormularioSinItems = proveedorId && !llevaItems && categoria !== "";
@@ -254,7 +313,8 @@ export default function NuevoComprobante({ onCancelar }) {
       (proveedorId && (items.length > 0 || usaIngresoSimplificado)));
   const muestraTotalSinItems =
     proveedorId && !llevaItems && toNum(importeTotal) > 0;
-  const encabezado = ENCABEZADOS_POR_CATEGORIA[categoria] ?? ENCABEZADO_INICIAL;
+  const encabezado = configCategoria.encabezado;
+  const encabezadoSeccionDocumento = configCategoria.seccionDocumento;
 
   useEffect(() => {
     if (tiposFiltrados.length === 1) {
@@ -826,16 +886,12 @@ export default function NuevoComprobante({ onCancelar }) {
     >
       <SESSection
         variant="premium"
-        title={esRemito ? "Datos del remito" : "Comprobante"}
-        subtitle={
-          esRemito
-            ? "Proveedor, numeración y fecha de emisión"
-            : "Tipo, proveedor, numeración, fechas y período fiscal"
-        }
+        title={encabezadoSeccionDocumento.title}
+        subtitle={encabezadoSeccionDocumento.subtitle}
         icon={FileText}
       >
         <SESComprobanteSection
-          CATEGORIAS={CATEGORIAS}
+          CATEGORIAS={CONFIG_CATEGORIAS}
           categoria={categoria}
           handleCategoriaChange={handleCategoriaChange}
           errores={errores}
