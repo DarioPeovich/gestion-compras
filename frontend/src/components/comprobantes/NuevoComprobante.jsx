@@ -22,6 +22,38 @@ const CATEGORIAS = {
   "Nota de Crédito Interna": (t) => t.descrip_abrev === "NCInt_Cmp",
 };
 
+const ENCABEZADO_INICIAL = {
+  title: "Nuevo comprobante",
+  subtitle: "Recepción y registración de comprobantes de compra",
+};
+
+const ENCABEZADOS_POR_CATEGORIA = {
+  Factura: {
+    title: "Nueva factura",
+    subtitle: "Recepción y registración de facturas de compra",
+  },
+  "Nota de Crédito": {
+    title: "Nueva nota de crédito",
+    subtitle: "Registración de notas de crédito de proveedores",
+  },
+  "Nota de Débito": {
+    title: "Nueva nota de débito",
+    subtitle: "Registración de notas de débito de proveedores",
+  },
+  Remito: {
+    title: "Nuevo remito",
+    subtitle: "Recepción de mercadería y actualización de stock",
+  },
+  "Nota de Crédito Interna": {
+    title: "Nueva nota de crédito interna",
+    subtitle: "Registración de ajustes internos de crédito",
+  },
+  "Nota de Débito Interna": {
+    title: "Nueva nota de débito interna",
+    subtitle: "Registración de ajustes internos de débito",
+  },
+};
+
 const CON_ITEMS = ["Factura", "Nota de Crédito", "Remito"];
 
 // ─── Formateo display ─────────────────────────────────────────────────────────
@@ -212,6 +244,7 @@ export default function NuevoComprobante({ onCancelar }) {
   const tipoSeleccionado = tiposTodos.find((t) => t.id === Number(tipoId));
   const llevaItems = CON_ITEMS.includes(categoria);
   const esRemito = categoria === "Remito";
+  const encabezado = ENCABEZADOS_POR_CATEGORIA[categoria] ?? ENCABEZADO_INICIAL;
 
   useEffect(() => {
     if (tiposFiltrados.length === 1) {
@@ -778,8 +811,8 @@ export default function NuevoComprobante({ onCancelar }) {
   // =============================================================================
   return (
     <SESWorkspace
-      title="Nuevo comprobante"
-      subtitle="Recepción y registración de comprobantes de compra"
+      title={encabezado.title}
+      subtitle={encabezado.subtitle}
     >
       <SESSection
         variant="premium"
