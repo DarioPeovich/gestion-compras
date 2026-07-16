@@ -100,6 +100,35 @@ React.
 -   Integración mediante REST.
 -   Protocolo de idempotencia basado en `operacionID`.
 
+## Convención de fechas, horas y zonas horarias
+
+-   Todas las columnas que representan un instante utilizan PostgreSQL
+    `timestamp with time zone` (`timestamptz`).
+-   Node.js persiste instantes mediante objetos `Date` o valores ISO en
+    UTC. PostgreSQL almacena internamente esos instantes normalizados.
+-   Las APIs intercambian fechas y horas en formato ISO 8601.
+-   El frontend convierte los instantes a la zona horaria local del
+    usuario al presentarlos. Para la presentación puede utilizarse
+    `new Date(fecha).toLocaleString("es-AR")` o una utilidad común del
+    frontend.
+-   No deben aplicarse manualmente desplazamientos de `-3 horas` ni
+    almacenarse fechas y horas locales sin información de zona horaria.
+-   Los campos que representan sólo una fecha de negocio, como la fecha
+    de emisión o la fecha de vencimiento, deben mantenerse diferenciados
+    de los campos de auditoría como `created_at` y `updated_at`.
+-   `created_at`, `updated_at`, las fechas de operaciones, los logs y la
+    idempotencia representan instantes absolutos.
+-   La configuración visual de pgAdmin puede mostrar un instante según
+    la zona horaria de la sesión sin que eso implique un error de
+    persistencia.
+
+Ejemplo:
+
+-   Valor intercambiado por la API: `2026-07-16T03:35:12.000Z`.
+-   Presentación para un usuario de Argentina: `16/07/2026 00:35:12`.
+
+Ambos valores representan el mismo instante.
+
 # 8. Riesgos conocidos
 
 -   No existen transacciones distribuidas entre PostgreSQL y HFSQL.

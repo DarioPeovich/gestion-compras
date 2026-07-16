@@ -919,9 +919,6 @@ export default function NuevoComprobante({ onCancelar }) {
             depositos={depositos}
             depositoId={depositoId}
             cargandoDepositos={cargandoDepositos}
-            handleConfirmar={handleConfirmar}
-            cargando={cargando}
-            onCancelar={onCancelar}
             esRemito={esRemito}
           />
         )}
@@ -935,13 +932,15 @@ export default function NuevoComprobante({ onCancelar }) {
               $ {fmt3(toNum(importeTotal))}
             </span>
           </div>
-          <SESFooterActions
-            onCancelar={onCancelar}
-            handleConfirmar={handleConfirmar}
-            cargando={cargando}
-          />
         </div>
       )}
+
+      <SESFooterActions
+        onCancelar={onCancelar}
+        handleConfirmar={handleConfirmar}
+        cargando={cargando}
+        confirmarLabel={esRemito ? "Confirmar remito" : "Confirmar comprobante"}
+      />
     </SESWorkspace>
   );
 }

@@ -3,7 +3,6 @@ import { Calculator, Trash2 } from "lucide-react";
 import SESIconButton from "../ui/actions/SESIconButton";
 import SESSection from "../ui/layout/SESSection";
 import SESCheckbox from "../ui/forms/SESCheckbox";
-import SESFooterActions from "./SESFooterActions.jsx";
 
 export default function SESResumenSection({
   modoIngreso,
@@ -42,9 +41,6 @@ export default function SESResumenSection({
   depositos,
   depositoId,
   cargandoDepositos,
-  handleConfirmar,
-  cargando,
-  onCancelar,
   esRemito,
 }) {
   if (esRemito) {
@@ -103,12 +99,6 @@ export default function SESResumenSection({
         </p>
         <ErrMsg campo="items" />
 
-        <SESFooterActions
-          onCancelar={onCancelar}
-          handleConfirmar={handleConfirmar}
-          cargando={cargando}
-          confirmarLabel="Confirmar remito"
-        />
       </SESSection>
     );
   }
@@ -443,11 +433,6 @@ export default function SESResumenSection({
               </div>
             )}
 
-            <SESFooterActions
-              onCancelar={onCancelar}
-              handleConfirmar={handleConfirmar}
-              cargando={cargando}
-            />
           </div>
         </div>
       </div>
