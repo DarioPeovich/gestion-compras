@@ -16,8 +16,8 @@ export default function SESItemsRemito({
   return (
     <SESSection
       variant="premium"
-      title="Ítems"
-      subtitle="Artículos, cantidades y costos"
+      title="Mercadería recibida"
+      subtitle="Artículos y cantidades ingresadas al depósito"
       icon={Package}
     >
       <>

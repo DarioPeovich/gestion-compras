@@ -244,6 +244,16 @@ export default function NuevoComprobante({ onCancelar }) {
   const tipoSeleccionado = tiposTodos.find((t) => t.id === Number(tipoId));
   const llevaItems = CON_ITEMS.includes(categoria);
   const esRemito = categoria === "Remito";
+  const esComprobanteFiscal = Boolean(tipoSeleccionado?.cbte_fiscal);
+  const usaIngresoDetallado = modoIngreso === "detallado";
+  const usaIngresoSimplificado = modoIngreso === "simplificado";
+  const muestraFormularioSinItems = proveedorId && !llevaItems && categoria !== "";
+  const muestraResumen =
+    llevaItems &&
+    ((esRemito && categoria) ||
+      (proveedorId && (items.length > 0 || usaIngresoSimplificado)));
+  const muestraTotalSinItems =
+    proveedorId && !llevaItems && toNum(importeTotal) > 0;
   const encabezado = ENCABEZADOS_POR_CATEGORIA[categoria] ?? ENCABEZADO_INICIAL;
 
   useEffect(() => {
@@ -281,11 +291,11 @@ export default function NuevoComprobante({ onCancelar }) {
   const totalImpInt_det = items.reduce((s, i) => s + toNum(i.importe_imp_interno), 0);
 
   // ── ICL/IDC/ImpInterno del pie: derivados en detallado, editables en simplificado
-  const pieICL = modoIngreso === "detallado" ? totalICL_det : toNum(pieOtros.icl);
-  const pieIDC = modoIngreso === "detallado" ? totalIDC_det : toNum(pieOtros.idc);
+  const pieICL = usaIngresoDetallado ? totalICL_det : toNum(pieOtros.icl);
+  const pieIDC = usaIngresoDetallado ? totalIDC_det : toNum(pieOtros.idc);
   const pieImpInternoCalculado = pieICL + pieIDC > 0;
   const pieImpInterno =
-    modoIngreso === "detallado"
+    usaIngresoDetallado
       ? pieImpInternoCalculado
         ? pieICL + pieIDC
         : totalImpInt_det
@@ -309,10 +319,10 @@ export default function NuevoComprobante({ onCancelar }) {
 
   // ── Sincronizar ivaFilas con items (detallado) ────────────────────────────────
   useEffect(() => {
-    if (modoIngreso === "detallado" && llevaItems) {
+    if (usaIngresoDetallado && llevaItems) {
       setIvaFilas(calcularIvaAgrupado(items));
     }
-  }, [items, modoIngreso, llevaItems]);
+  }, [items, usaIngresoDetallado, llevaItems]);
 
   // ── Carga inicial ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -816,8 +826,12 @@ export default function NuevoComprobante({ onCancelar }) {
     >
       <SESSection
         variant="premium"
-        title="Comprobante"
-        subtitle="Tipo, proveedor, numeración, fechas y período fiscal"
+        title={esRemito ? "Datos del remito" : "Comprobante"}
+        subtitle={
+          esRemito
+            ? "Proveedor, numeración y fecha de emisión"
+            : "Tipo, proveedor, numeración, fechas y período fiscal"
+        }
         icon={FileText}
       >
         <SESComprobanteSection
@@ -885,7 +899,7 @@ export default function NuevoComprobante({ onCancelar }) {
         />
       )}
       {/* ── ZONA 3B — Nota Interna / ND ────────────────────────────────────── */}
-      {proveedorId && !llevaItems && categoria !== "" && (
+      {muestraFormularioSinItems && (
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">Motivo</label>
@@ -912,9 +926,7 @@ export default function NuevoComprobante({ onCancelar }) {
       )}
 
       {/* ── ZONA 4 — Pie ───────────────────────────────────────────────────── */}
-      {llevaItems &&
-        ((esRemito && categoria) ||
-          (proveedorId && (items.length > 0 || modoIngreso === "simplificado"))) && (
+      {muestraResumen && (
           <SESResumenSection
             modoIngreso={modoIngreso}
             addIvaFila={addIvaFila}
@@ -957,7 +969,7 @@ export default function NuevoComprobante({ onCancelar }) {
         )}
 
       {/* Pie nota interna / ND */}
-      {proveedorId && !llevaItems && toNum(importeTotal) > 0 && (
+      {muestraTotalSinItems && (
         <div className="flex justify-between items-center border-t border-gray-200 pt-4">
           <div className="flex items-center">
             <span className="font-semibold text-gray-800 mr-4">Total:</span>

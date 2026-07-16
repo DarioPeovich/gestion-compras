@@ -50,8 +50,9 @@ export default function SESResumenSection({
         title="Recepción"
         subtitle="Sucursal, depósito y actualización obligatoria de stock"
         icon={Calculator}
+        contentClassName="px-8 py-5"
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-x-3 gap-y-2 md:grid-cols-2">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
               Sucursal
@@ -94,7 +95,7 @@ export default function SESResumenSection({
           </div>
         </div>
 
-        <p className="mt-3 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-gray-500">
           La actualización de stock es obligatoria para registrar el remito.
         </p>
         <ErrMsg campo="items" />
