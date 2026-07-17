@@ -633,7 +633,14 @@ export default function NuevoComprobante({ onCancelar }) {
         }
       } else {
         if (totalBaseFilas <= 0) errs.ivaFilas = "Ingresá la base imponible del IVA";
-        if (totalManual <= 0) errs.totalManual = "Ingresá el total de la factura";
+      }
+      if (!Number.isFinite(totalManual) || totalManual <= 0) {
+        errs.totalManual = "Ingresá el Total Factura.";
+      } else if (
+        Number.isFinite(sumaCalculada) &&
+        Math.abs(totalManual - sumaCalculada) > 0.05
+      ) {
+        errs.totalManual = "El Total Factura no coincide con el total calculado.";
       }
     }
   };
