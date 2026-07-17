@@ -615,53 +615,41 @@ export default function NuevoComprobante({ onCancelar }) {
     }
   };
 
-  const validar = async () => {
-    const errs = {};
-
-    validarCamposComunes(errs);
-
-    if (esRemito) {
-      if (!Number.isInteger(Number(proveedorId)) || Number(proveedorId) <= 0) {
-        errs.proveedorId = "Seleccioná un proveedor válido";
-      }
-      if (!Number.isInteger(Number(puntoVenta)) || Number(puntoVenta) <= 0) {
-        errs.puntoVenta = "Ingresá un punto de venta válido";
-      }
-      if (!Number.isInteger(Number(nroComprobante)) || Number(nroComprobante) <= 0) {
-        errs.nroComprobante = "Ingresá un número de remito válido";
-      }
-      if (!Number.isInteger(Number(sucursalId)) || Number(sucursalId) <= 0) {
-        errs.sucursalId = "Seleccioná la sucursal";
-      }
-      if (!Number.isInteger(Number(depositoId)) || Number(depositoId) <= 0) {
-        errs.depositoId = "Seleccioná el depósito";
-      }
-      if (items.length === 0) {
-        errs.items = "Agregá al menos un artículo";
-      } else {
-        const itemInvalido = items.find(
-          (item) =>
-            !Number.isInteger(Number(item.hfsql_articulos_id)) ||
-            Number(item.hfsql_articulos_id) <= 0 ||
-            !(toNum(item.cantidad) > 0) ||
-            !resolverCodigoArticulo(item) ||
-            !String(item.descripcion || "").trim()
-        );
-        if (itemInvalido) {
-          errs.items =
-            "Todos los artículos deben tener código, descripción y cantidad mayor a cero";
+  const validarDocumentoConItems = (errs) => {
+    if (llevaItems) {
+      if (modoIngreso === "detallado") {
+        if (items.length === 0) {
+          errs.items = "Agregá al menos un ítem";
+        } else {
+          // ── Descripción obligatoria en conceptos manuales ────────────────
+          const sinDescripcion = items.some(
+            (i) => Number(i.hfsql_articulos_id) === -99 && !i.descripcion?.trim()
+          );
+          if (sinDescripcion) errs.items = "Hay conceptos manuales sin descripción";
+          else if (subtotalNeto <= 0) errs.items = "El subtotal debe ser mayor a cero";
         }
+      } else {
+        if (totalBaseFilas <= 0) errs.ivaFilas = "Ingresá la base imponible del IVA";
+        if (totalManual <= 0) errs.totalManual = "Ingresá el total de la factura";
       }
-
-      setErrores(errs);
-      return Object.keys(errs).length === 0;
     }
+  };
 
-    validarFactura(errs);
+  const validarDocumentoSinItems = (errs) => {
+    if (!llevaItems) {
+      if (toNum(importeTotal) <= 0) errs.importeTotal = "Ingresá el importe total";
+    }
+  };
 
-    validarDatosFiscales(errs);
+  const validarStockOpcional = (errs) => {
+    if (actualizarStock && hayItemsReales) {
+      if (!sucursalId) errs.sucursalId = "Seleccioná la sucursal";
+      if (!depositoId) errs.depositoId = "Seleccioná el depósito";
+    }
+  };
 
-    // ── Validación duplicados ──────────────────────────────────────────────
+  // ── Validación duplicados ───────────────────────────────────────────────
+  const validarDuplicado = async (errs) => {
     if (
       tipoSeleccionado?.cbte_fiscal &&
       tipoId &&
@@ -685,31 +673,65 @@ export default function NuevoComprobante({ onCancelar }) {
         /* si falla la verificación, dejamos pasar y Node captura el P2002 */
       }
     }
+  };
 
-    if (llevaItems) {
-      if (modoIngreso === "detallado") {
-        if (items.length === 0) {
-          errs.items = "Agregá al menos un ítem";
-        } else {
-          // ── Descripción obligatoria en conceptos manuales ────────────────
-          const sinDescripcion = items.some(
-            (i) => Number(i.hfsql_articulos_id) === -99 && !i.descripcion?.trim()
-          );
-          if (sinDescripcion) errs.items = "Hay conceptos manuales sin descripción";
-          else if (subtotalNeto <= 0) errs.items = "El subtotal debe ser mayor a cero";
-        }
-      } else {
-        if (totalBaseFilas <= 0) errs.ivaFilas = "Ingresá la base imponible del IVA";
-        if (totalManual <= 0) errs.totalManual = "Ingresá el total de la factura";
-      }
+  const validarRemito = (errs) => {
+    if (!Number.isInteger(Number(proveedorId)) || Number(proveedorId) <= 0) {
+      errs.proveedorId = "Seleccioná un proveedor válido";
+    }
+    if (!Number.isInteger(Number(puntoVenta)) || Number(puntoVenta) <= 0) {
+      errs.puntoVenta = "Ingresá un punto de venta válido";
+    }
+    if (!Number.isInteger(Number(nroComprobante)) || Number(nroComprobante) <= 0) {
+      errs.nroComprobante = "Ingresá un número de remito válido";
+    }
+    if (!Number.isInteger(Number(sucursalId)) || Number(sucursalId) <= 0) {
+      errs.sucursalId = "Seleccioná la sucursal";
+    }
+    if (!Number.isInteger(Number(depositoId)) || Number(depositoId) <= 0) {
+      errs.depositoId = "Seleccioná el depósito";
+    }
+    if (items.length === 0) {
+      errs.items = "Agregá al menos un artículo";
     } else {
-      if (toNum(importeTotal) <= 0) errs.importeTotal = "Ingresá el importe total";
+      const itemInvalido = items.find(
+        (item) =>
+          !Number.isInteger(Number(item.hfsql_articulos_id)) ||
+          Number(item.hfsql_articulos_id) <= 0 ||
+          !(toNum(item.cantidad) > 0) ||
+          !resolverCodigoArticulo(item) ||
+          !String(item.descripcion || "").trim()
+      );
+      if (itemInvalido) {
+        errs.items =
+          "Todos los artículos deben tener código, descripción y cantidad mayor a cero";
+      }
+    }
+  };
+
+  const validar = async () => {
+    const errs = {};
+
+    validarCamposComunes(errs);
+
+    if (esRemito) {
+      validarRemito(errs);
+
+      setErrores(errs);
+      return Object.keys(errs).length === 0;
     }
 
-    if (actualizarStock && hayItemsReales) {
-      if (!sucursalId) errs.sucursalId = "Seleccioná la sucursal";
-      if (!depositoId) errs.depositoId = "Seleccioná el depósito";
-    }
+    validarFactura(errs);
+
+    validarDatosFiscales(errs);
+
+    await validarDuplicado(errs);
+
+    validarDocumentoConItems(errs);
+
+    validarDocumentoSinItems(errs);
+
+    validarStockOpcional(errs);
 
     setErrores(errs);
     return Object.keys(errs).length === 0;
