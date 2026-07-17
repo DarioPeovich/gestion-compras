@@ -10,6 +10,7 @@ import SESFooterActions from "./SESFooterActions.jsx";
 import SESItemsSection from "./SESItemsSection.jsx";
 import SESProveedorSection from "./SESProveedorSection.jsx";
 import SESResumenSection from "./SESResumenSection.jsx";
+import useSESToast from "../ui/feedback/useSESToast";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
@@ -240,6 +241,8 @@ const NumInput = ({ value, onValueChange, className, placeholder = "0,000" }) =>
 
 // =============================================================================
 export default function NuevoComprobante({ onCancelar }) {
+  const { showToast } = useSESToast();
+
   // ── Tipo / cabecera ──────────────────────────────────────────────────────────
   const [tiposTodos, setTiposTodos] = useState([]);
   const [categoria, setCategoria] = useState("");
@@ -749,7 +752,14 @@ export default function NuevoComprobante({ onCancelar }) {
 
   // ── REGISTRAR ─────────────────────────────────────────────────────────────────
   const handleConfirmar = async () => {
-    if (!(await validar())) return;
+    const esValido = await validar();
+    if (!esValido) {
+      showToast({
+        type: "error",
+        message: "Revisá los campos marcados antes de confirmar.",
+      });
+      return;
+    }
     setCargando(true);
     try {
       if (esRemito) {
