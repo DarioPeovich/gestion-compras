@@ -129,6 +129,66 @@ Ejemplo:
 
 Ambos valores representan el mismo instante.
 
+## Impuestos Internos, ICL e IDC
+
+ICL e IDC no son impuestos adicionales independientes del Impuesto
+Interno. Son una subdivisión analítica de los Impuestos Internos utilizada
+específicamente para combustibles:
+
+``` text
+Impuestos Internos
+├── ICL
+└── IDC
+```
+
+Para combustibles se cumple la relación:
+
+``` text
+imp_interno = icl + idc
+```
+
+`imp_interno` conserva el importe total de Impuestos Internos, mientras
+que `icl` e `idc` conservan su composición fiscal específica. Por esta
+razón es válido persistir los tres valores: el primero representa el total
+y los otros dos su desglose analítico.
+
+Al calcular el total económico de un comprobante, el impuesto debe
+computarse una sola vez. La regla es:
+
+``` text
+Si icl + idc > 0:
+    impuesto interno computable = icl + idc
+En caso contrario:
+    impuesto interno computable = imp_interno
+```
+
+Nunca debe calcularse `icl + idc + imp_interno`, porque en combustibles
+eso produciría un doble conteo del mismo impuesto.
+
+Para productos cuyo Impuesto Interno no se subdivide, como los
+cigarrillos, `icl` e `idc` son cero y `imp_interno` contiene el importe
+completo. En esos casos, el total se obtiene directamente desde
+`imp_interno`.
+
+La invariante del modelo es:
+
+``` text
+Registros con desglose de combustible:
+    imp_interno = icl + idc
+
+Registros sin desglose:
+    icl = 0
+    idc = 0
+    imp_interno contiene el total no subdividido
+```
+
+Esta regla debe respetarse en el cálculo del total del comprobante, la
+persistencia de tributos, la generación de payloads, las validaciones del
+frontend y del backend, los informes fiscales y las consultas y
+totalizaciones contables. Toda consulta o proceso que sume simultáneamente
+`imp_interno`, `icl` e `idc` puede duplicar el impuesto correspondiente a
+combustibles.
+
 # 8. Riesgos conocidos
 
 -   No existen transacciones distribuidas entre PostgreSQL y HFSQL.

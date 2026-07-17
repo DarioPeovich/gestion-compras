@@ -366,10 +366,13 @@ export default function NuevoComprobante({ onCancelar }) {
   // ── Totales del pie ───────────────────────────────────────────────────────────
   const totalIvaFilas = ivaFilas.reduce((s, f) => s + toNum(f.importe_iva), 0);
   const totalBaseFilas = ivaFilas.reduce((s, f) => s + toNum(f.base_imponible), 0);
+  const totalIvaItems = items.reduce((s, i) => s + toNum(i.importe_iva), 0);
+  const baseEfectiva = usaIngresoDetallado ? subtotalNeto : totalBaseFilas;
+  const ivaEfectivo = usaIngresoDetallado ? totalIvaItems : totalIvaFilas;
   const totalICLIDC = pieICL + pieIDC;
   const sumaCalculada =
-    totalBaseFilas +
-    totalIvaFilas +
+    baseEfectiva +
+    ivaEfectivo +
     totalICLIDC +
     (pieImpInternoCalculado ? 0 : pieImpInterno) +
     toNum(pieOtros.iibb) +
