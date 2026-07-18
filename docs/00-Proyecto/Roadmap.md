@@ -178,3 +178,74 @@ Estado
 - Dashboard operativo
 - Reportes
 - BI
+
+---
+
+# Política de documentación
+
+## Fuente oficial de la documentación
+
+A partir de la versión **Compras v1.1.0**, el proyecto adopta una política documental basada en una única fuente de verdad.
+
+### Principio
+
+Todos los documentos **Markdown (.md)** constituyen la documentación técnica oficial del proyecto.
+
+Toda modificación funcional, técnica, arquitectónica o de diseño deberá registrarse primero en el documento Markdown correspondiente.
+
+### Documentos Word
+
+Los documentos **Microsoft Word (.docx)** son exclusivamente versiones derivadas para distribución, presentación o impresión.
+
+No deben editarse manualmente. Siempre deberán generarse a partir del contenido vigente del documento Markdown correspondiente.
+
+### Flujo documental
+
+```text
+Cambio del proyecto
+        │
+        ▼
+Actualización del Markdown
+        │
+        ▼
+Revisión técnica
+        │
+        ▼
+Generación del DOCX
+```
+
+### Objetivos
+
+- Mantener una única fuente de verdad.
+- Evitar diferencias entre las versiones Markdown y Word.
+- Facilitar el versionado mediante Git.
+- Simplificar el mantenimiento documental.
+- Permitir regenerar documentación distribuible en cualquier momento.
+- Garantizar que toda la documentación técnica permanezca sincronizada.
+
+### Regla para futuras tareas
+
+Toda documentación técnica del proyecto deberá seguir obligatoriamente este flujo de trabajo:
+
+1. Crear inicialmente el documento en formato Markdown.
+2. Actualizar el Markdown cuando existan cambios funcionales o técnicos.
+3. Revisar técnicamente el contenido del Markdown.
+4. Generar el documento DOCX a partir del Markdown vigente.
+5. No editar posteriormente el DOCX de forma manual.
+
+> Toda nueva documentación técnica deberá crearse inicialmente en formato Markdown. La generación del documento DOCX será siempre el último paso del proceso documental y nunca el primero.
+
+Esta regla garantiza que exista una única fuente de verdad documental para todo el proyecto.
+
+## Directriz para asistentes de IA
+
+Cuando un asistente de IA participe en tareas documentales deberá:
+
+- Considerar siempre el Markdown como fuente oficial.
+- No modificar directamente documentos DOCX.
+- Actualizar primero el Markdown antes de generar cualquier documento Word.
+- Generar los DOCX utilizando el contenido vigente del Markdown.
+- Mantener sincronizadas las versiones Markdown y DOCX.
+- Aplicar la versión Markdown cuando exista cualquier diferencia entre ambas representaciones.
+
+Esta directriz es obligatoria para cualquier herramienta de IA utilizada en el proyecto, incluidos ChatGPT, Codex y otras herramientas equivalentes.
