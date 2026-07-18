@@ -318,6 +318,27 @@ export default function NuevoComprobante({ onCancelar }) {
     proveedorId && !llevaItems && toNum(importeTotal) > 0;
   const encabezado = configCategoria.encabezado;
   const encabezadoSeccionDocumento = configCategoria.seccionDocumento;
+  const tieneDatosIngresados =
+    Boolean(proveedorId) ||
+    String(puntoVenta).trim() !== "" ||
+    String(nroComprobante).trim() !== "" ||
+    fecha !== "" ||
+    fechaVto !== "" ||
+    periodoFiscal !== "" ||
+    (tiposFiltrados.length > 1 && tipoId !== "") ||
+    modoIngreso !== "detallado" ||
+    items.length > 0 ||
+    (modoIngreso === "simplificado" &&
+      ivaFilas.some(
+        (fila) =>
+          toNum(fila.base_imponible) !== 0 || toNum(fila.importe_iva) !== 0
+      )) ||
+    Object.values(pieOtros).some((valor) => toNum(valor) !== 0) ||
+    toNum(totalManual) !== 0 ||
+    motivo.trim() !== "" ||
+    toNum(importeTotal) !== 0 ||
+    actualizarStock ||
+    Boolean(sucursalId);
 
   useEffect(() => {
     if (tiposFiltrados.length === 1) {
@@ -1096,6 +1117,7 @@ export default function NuevoComprobante({ onCancelar }) {
         onCancelar={onCancelar}
         handleConfirmar={handleConfirmar}
         cargando={cargando}
+        tieneDatosIngresados={tieneDatosIngresados}
         confirmarLabel={esRemito ? "Confirmar remito" : "Confirmar comprobante"}
       />
     </SESWorkspace>
