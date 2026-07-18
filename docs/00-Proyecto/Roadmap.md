@@ -1,13 +1,13 @@
 # ROADMAP
 
 Última actualización:
-2026-07-16
+2026-07-18
 
 Versión del producto:
-Compras v0.9
+Compras v1.1.0
 
 Próximo objetivo:
-Consolidación Frontend
+Órdenes de Compra
 
 Estado general:
 🟡 Desarrollo activo
@@ -22,7 +22,7 @@ Cada etapa puede contener uno o varios sprints de implementación.
 
 # Estado actual
 
-Versión del módulo: Compras v0.9
+Versión del módulo: Compras v1.1.0
 
 ## Finalizado
 
@@ -50,6 +50,8 @@ Versión del módulo: Compras v0.9
 
 ✔ Documentación base
 
+✔ Consolidación estructural del Frontend v1
+
 ---
 
 # Etapa 1
@@ -62,14 +64,42 @@ Reducir deuda técnica surgida durante la implementación inicial.
 
 Incluye
 
-- Especialización de componentes SESItemsFactura / SESItemsRemito
-- Optimización visual de Remitos
-- Ajustes UX
-- Limpieza de lógica condicional
+- ✔ Limpieza condicional y constantes derivadas
+- ✔ Configuración centralizada por categorías
+- ✔ Validaciones específicas extraídas
+- ✔ Especialización `SESItemsFactura` / `SESItemsRemito`
+- ✔ Consolidación del frontend de Remitos
+- ✔ Estabilización de `sumaCalculada`
+- ✔ Validación de Total Factura
+- ✔ Infraestructura global `SESToast`
+- ✔ `SESConfirmDialog`
+- ✔ Cancelación inteligente
 
 Estado
 
-🟡 Pendiente
+✔ Consolidación estructural finalizada
+
+Mejoras incrementales pendientes
+
+- Búsqueda de artículos por Código SES, endpoint WinDev y mensaje visual de error.
+- Presentación de alícuota IVA 10,50 %.
+- Validación de motivo, numeración automática y cuenta corriente de NC/ND internas.
+- Sustitución del `window.confirm` del cambio de modo detallado/simplificado.
+- Confirmación definitiva del mapeo del id de artículo en Remitos.
+- Asociación de Remitos con Facturas y Órdenes de Compra.
+- Reversa o anulación de stock y compensación de resultados inciertos de WinDev.
+- Documentación detallada del frontend y documentación final DOCX.
+
+Validación
+
+- Build e inspección técnica completados.
+- Prueba interactiva completa de `SESConfirmDialog` pendiente a cargo del operador.
+
+Deuda técnica externa — WinDev
+
+- El mantenimiento de artículos debe garantizar `ICL + IDC = Impuesto Interno` cuando existe desglose.
+- Si ICL e IDC están vacíos o en cero, Impuesto Interno puede conservar un valor independiente.
+- SES Compras no clasifica combustibles: utiliza `ICL + IDC` cuando la suma es positiva y `imp_interno_monto` en caso contrario.
 
 ---
 
