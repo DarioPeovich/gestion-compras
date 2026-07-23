@@ -90,6 +90,7 @@ model compras_comprobantes {
   created_at                            DateTime                                @default(now()) @db.Timestamptz(6)
   updated_at                            DateTime                                @default(now()) @db.Timestamptz(6)
   periodo_fiscal                        String?                                 @db.VarChar(7)
+  operacion_id                          String?                                 @unique @db.Uuid
   compras_cc_movimientos                compras_cc_movimientos[]
   compras_comprobantes_tipo             compras_comprobantes_tipo               @relation(fields: [comprobante_tipo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   compras_proveedores                   compras_proveedores                     @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -148,7 +149,6 @@ model compras_comprobantes_tributos_detalle {
 
 model compras_remitos {
   id                        Int                         @id @default(autoincrement())
-  operacion_id              String?                     @unique @db.Uuid
   proveedor_id              Int
   orden_compra_id           Int?
   fecha                     DateTime                    @default(dbgenerated("CURRENT_DATE")) @db.Date
@@ -161,6 +161,7 @@ model compras_remitos {
   updated_at                DateTime                    @default(now()) @db.Timestamp(6)
   punto_venta               Int
   numero_remito             Int
+  operacion_id              String?                     @unique @db.Uuid
   compras_ordenes_compra    compras_ordenes_compra?     @relation(fields: [orden_compra_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   compras_proveedores       compras_proveedores         @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   compras_remitos_asociados compras_remitos_asociados[]

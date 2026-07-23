@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import prisma from '../config/prisma.js'
+import { ejecutarOperacionWinDev } from '../services/windevClient.js'
 
 // IDs en tributosSubTabla.fic de HFSQL
 const TRIBUTO_IVA         = 1
@@ -93,6 +95,29 @@ export const registrarComprobante = async (req, res, next) => {
     const esFiscal    = tipo.cbte_fiscal
     const factor      = tipo.factor
     const hfsqlTipoId = tipo.hfsql_comprobante_tipo_id
+    const actualizarStock = req.body.actualizar_stock === true
+    const depositoId = Number(req.body.deposito_id)
+    if (actualizarStock && (!Number.isInteger(depositoId) || depositoId <= 0)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'deposito_id es obligatorio y debe ser un entero positivo cuando se actualiza stock',
+      })
+    }
+    const itemsReales = items.filter(i => Number(i.hfsql_articulos_id) !== -99)
+    const hayIntegracionWinDev = itemsReales.length > 0 && (
+      actualizarStock || itemsReales.some(i => i.actualizar_costo === true)
+    )
+    const operacionId = hayIntegracionWinDev ? randomUUID() : null
+
+    let proveedorHfsqlId = null
+    if (hayIntegracionWinDev) {
+      const proveedor = await prisma.compras_proveedores.findUnique({
+        where: { id: Number(proveedor_id) },
+        select: { hfsql_proveedores_id: true },
+      })
+      proveedorHfsqlId = proveedor?.hfsql_proveedores_id
+
+    }
 
     // ── Subtotal desde líneas o desde body ───────────────────────────────
     const subtotalCalc = items.length > 0
@@ -156,6 +181,7 @@ export const registrarComprobante = async (req, res, next) => {
           total:               totalCalc,
           saldo:               totalCalc,
           estado:              'CONFIRMADO',
+          operacion_id:        operacionId,
           observaciones:       observaciones || null,
           usuario_id:          Number(usuario_id),
         }
@@ -254,74 +280,103 @@ export const registrarComprobante = async (req, res, next) => {
     }) // fin $transaction
 
     // ── WinDev: actualizar costos ─────────────────────────────────────────
-    const WINDEV_URL     = process.env.WINDEV_API_URL
-    const itemsParaCosto = items.filter(
-      i => Number(i.hfsql_articulos_id) !== -99 && i.actualizar_costo
-    )
-    if (itemsParaCosto.length > 0 && hfsqlTipoId && WINDEV_URL) {
-      try {
-        await fetch(`${WINDEV_URL}/apicompras/articulos/actualizar-costo`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items: itemsParaCosto.map(i => {
-              const icl_unit      = Number(i.importe_icl || 0) / (Number(i.cantidad) || 1)
-              const idc_unit      = Number(i.importe_idc || 0) / (Number(i.cantidad) || 1)
-              const esCombustible = icl_unit > 0 || idc_unit > 0
-              return {
-                articulosID:       i.hfsql_articulos_id,
-                nuevoPrecioCosto:  i.precio_costo,
-                proveedoresID:     Number(proveedor_id),
-                impTransfComb:     icl_unit,
-                impDioxidoCarbono: idc_unit,
-                impInternoMonto:   esCombustible
-                  ? icl_unit + idc_unit
-                  : Number(i.importe_imp_interno || 0) / (Number(i.cantidad) || 1),
-                ivaTiposID:        Number(i.iva_tipo_id) || 0,
-              }
-            })
-          })
-        })
-      } catch (err) {
-        console.error('[registrar] Error actualizando costos en WinDev:', err.message)
-      }
-    }
+    let integracion = null
 
     // ── WinDev: actualizar stock ──────────────────────────────────────────
-    const actualizarStock = req.body.actualizar_stock === true
-    const itemsParaStock  = items.filter(i => Number(i.hfsql_articulos_id) !== -99)
-    if (actualizarStock && itemsParaStock.length > 0 && hfsqlTipoId && WINDEV_URL) {
-      try {
-        const resStock = await fetch(`${WINDEV_URL}/apicompras/stock/actualizar`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            comprobanteTipoId: hfsqlTipoId,
-            depositoId:        Number(req.body.deposito_id),
-            factor,
-            usuarioId:         Number(usuario_id),
-            usuarioNombre:     req.body.usuario_nombre || '',
-            observaciones:     `${tipo.descrip_abrev} ${String(punto_venta).padStart(4,'0')}-${String(numero_comprobante).padStart(8,'0')}`,
-            puntoVenta:        Number(punto_venta) || 0,
-            nroComprobante:    Number(numero_comprobante) || 0,
-            items: itemsParaStock.map(i => ({
-              articulosID: i.hfsql_articulos_id,
-              cantidad:    i.cantidad,
-              descripcion: i.articulo_descrip,
-              precioCosto: i.precio_costo,
-            }))
-          })
+    if (hayIntegracionWinDev) {
+      const WINDEV_URL = process.env.WINDEV_API_URL
+      if (!hfsqlTipoId || !proveedorHfsqlId) {
+        return res.status(502).json({
+          ok: false,
+          error: 'No se pudo iniciar la integración con WinDev',
+          detalle: 'No se encontró la configuración HFSQL del tipo de comprobante o del proveedor',
+          operacionID: operacionId,
+          estadoIntegracion: 'ERROR',
         })
-        if (resStock.ok) {
-          await prisma.compras_comprobantes.update({
-            where: { id: resultado.id },
-            data:  { fecha_actualizacion_stock: new Date() }
-          })
-        } else {
-          console.error('[registrar] WinDev stock respondió:', resStock.status)
-        }
-      } catch (err) {
-        console.error('[registrar] Error actualizando stock en WinDev:', err.message)
+      }
+      if (!WINDEV_URL) {
+        return res.status(502).json({
+          ok: false,
+          error: 'No se pudo iniciar la integración con WinDev',
+          detalle: 'La API WinDev no está configurada',
+          operacionID: operacionId,
+          estadoIntegracion: 'ERROR',
+        })
+      }
+
+      const payload = {
+        operacionID: operacionId,
+        tipoOperacion: 'ACTUALIZAR_ARTICULOS_STOCK',
+        tipoEntidad: 'COMPROBANTE_COMPRA',
+        entidadID: resultado.id,
+        comprobanteTipoId: hfsqlTipoId,
+        depositoId: actualizarStock ? depositoId : 0,
+        factor,
+        usuarioId: Number(usuario_id),
+        usuarioNombre: req.body.usuario_nombre || '',
+        observaciones: observaciones || `${tipo.descrip_abrev} ${String(punto_venta).padStart(4,'0')}-${String(numero_comprobante).padStart(8,'0')}`,
+        puntoVenta: Number(punto_venta) || 0,
+        nroComprobante: Number(numero_comprobante) || 0,
+        actualizarStock,
+        items: itemsReales.map(i => {
+          const cantidad = Number(i.cantidad) || 1
+          const iclUnit = Number(i.importe_icl || 0) / cantidad
+          const idcUnit = Number(i.importe_idc || 0) / cantidad
+          const esCombustible = iclUnit > 0 || idcUnit > 0
+
+          return {
+            articulosID: Number(i.hfsql_articulos_id),
+            descripcion: String(i.articulo_descrip),
+            cantidad: Number(i.cantidad),
+            precioCosto: Number(i.precio_costo),
+            actualizarCosto: i.actualizar_costo === true,
+            proveedoresID: Number(proveedorHfsqlId),
+            impTransfComb: iclUnit,
+            impDioxidoCarbono: idcUnit,
+            impInternoMonto: esCombustible
+              ? iclUnit + idcUnit
+              : Number(i.importe_imp_interno || 0) / cantidad,
+            ivaTiposID: Number(i.iva_tipo_id) || 0,
+          }
+        }),
+      }
+
+      integracion = await ejecutarOperacionWinDev({
+        windevUrl: WINDEV_URL,
+        endpoint: '/apicompras/comprobantes/actualizar-articulos-stock',
+        operacionId,
+        payload,
+      })
+
+      if (integracion.estado === 'ERROR') {
+        return res.status(502).json({
+          ok: false,
+          error: 'WinDev rechazó la actualización de artículos y stock',
+          detalle: integracion.error,
+          operacionID: operacionId,
+          estadoIntegracion: 'ERROR',
+          resultadoIntegracion: integracion.resultado,
+        })
+      }
+
+      if (integracion.estado === 'INCIERTA') {
+        return res.status(502).json({
+          ok: false,
+          error: 'El resultado de la integración con WinDev es incierto',
+          detalle: `${integracion.error}. Debe consultarse la operación con el mismo UUID.`,
+          operacionID: operacionId,
+          estadoIntegracion: 'INCIERTA',
+        })
+      }
+
+      if (
+        actualizarStock &&
+        integracion?.estado === 'APLICADA'
+      ) {
+        await prisma.compras_comprobantes.update({
+          where: { id: resultado.id },
+          data: { fecha_actualizacion_stock: new Date() },
+        })
       }
     }
 
@@ -334,6 +389,9 @@ export const registrarComprobante = async (req, res, next) => {
         total:            totalCalc,
         saldo:            totalCalc,
         estado:           'CONFIRMADO',
+        operacionID:      operacionId,
+        estadoIntegracion: integracion?.estado,
+        resultadoIntegracion: integracion?.resultado,
       }
     })
 

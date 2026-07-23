@@ -1,97 +1,16 @@
 import prisma from "../config/prisma.js";
 import { randomUUID } from "node:crypto";
+import {
+  TIMEOUT_POST_WINDEV_MS,
+  consultarOperacionWinDevLegacy as consultarOperacionWinDev,
+  fetchConTimeout,
+  leerJsonSeguro,
+} from "../services/windevClient.js";
 
 const DESCRIP_ABREV_REMITO = "RtoCmp";
-const TIMEOUT_POST_WINDEV_MS = 8000;
-const TIMEOUT_GET_WINDEV_MS = 4000;
-const INTENTOS_CONFIRMACION_WINDEV = 5;
-const DEMORA_CONFIRMACION_WINDEV_MS = 500;
 
 const campoEnteroPositivo = (value) =>
   Number.isInteger(Number(value)) && Number(value) > 0;
-
-const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const fetchConTimeout = async (url, options, timeoutMs) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-};
-
-const leerJsonSeguro = async (response) => {
-  const texto = await response.text();
-  if (!texto.trim()) throw new Error("WinDev devolvió un cuerpo vacío");
-
-  try {
-    return JSON.parse(texto);
-  } catch {
-    throw new Error("WinDev devolvió un JSON inválido");
-  }
-};
-
-const consultarOperacionWinDev = async (windevUrl, operacionId) => {
-  let ultimoError = "No se pudo confirmar la operación en WinDev";
-
-  for (let intento = 1; intento <= INTENTOS_CONFIRMACION_WINDEV; intento++) {
-    try {
-      const response = await fetchConTimeout(
-        `${windevUrl}/apicompras/operaciones/${encodeURIComponent(
-          operacionId
-        )}`,
-        {},
-        TIMEOUT_GET_WINDEV_MS
-      );
-      const resultado = await leerJsonSeguro(response);
-
-      if (!response.ok) {
-        ultimoError = `WinDev respondió HTTP ${response.status} al consultar la operación`;
-      } else if (resultado.operacionID !== operacionId) {
-        ultimoError = "WinDev devolvió un operacionID inesperado";
-      } else if (resultado.ok === true && resultado.estado === "APLICADA") {
-        return { aplicada: true, resultado };
-      } else if (resultado.estado === "ERROR") {
-        return {
-          aplicada: false,
-          definitiva: true,
-          error:
-            resultado.error ||
-            resultado.mensajeError ||
-            "WinDev informó un error al actualizar el stock",
-          resultado,
-        };
-      } else if (
-        resultado.estado === "RECIBIDA" ||
-        resultado.estado === "PROCESANDO"
-      ) {
-        ultimoError = `La operación continúa en estado ${resultado.estado}`;
-      } else if (
-        resultado.estado === "NO_ENCONTRADA" ||
-        resultado.encontrada === false
-      ) {
-        ultimoError = "La operación todavía no fue encontrada en WinDev";
-      } else {
-        ultimoError =
-          "WinDev devolvió una respuesta inesperada al consultar la operación";
-      }
-    } catch (error) {
-      ultimoError =
-        error.name === "AbortError"
-          ? "Timeout al consultar la operación en WinDev"
-          : error.message;
-    }
-
-    if (intento < INTENTOS_CONFIRMACION_WINDEV) {
-      await esperar(DEMORA_CONFIRMACION_WINDEV_MS);
-    }
-  }
-
-  return { aplicada: false, definitiva: false, error: ultimoError };
-};
 
 const eliminarRemitoSinStock = (remitoId) =>
   prisma.$transaction(async (tx) => {
