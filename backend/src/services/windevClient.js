@@ -31,7 +31,9 @@ export const consultarOperacionWinDev = async (windevUrl, operacionId) => {
   for (let intento = 1; intento <= INTENTOS_CONFIRMACION_WINDEV; intento++) {
     try {
       const response = await fetchConTimeout(
-        `${windevUrl}/apicompras/operaciones/${encodeURIComponent(operacionId)}`,
+        `${windevUrl}/apicompras/operaciones/${encodeURIComponent(
+          operacionId
+        )}`,
         {},
         TIMEOUT_GET_WINDEV_MS
       );
@@ -46,20 +48,31 @@ export const consultarOperacionWinDev = async (windevUrl, operacionId) => {
       } else if (resultado.estado === "ERROR") {
         return {
           estado: "ERROR",
-          error: resultado.error || resultado.mensajeError || "WinDev informó un error al procesar la operación",
+          error:
+            resultado.error ||
+            resultado.mensajeError ||
+            "WinDev informó un error al procesar la operación",
           resultado,
         };
-      } else if (resultado.estado === "RECIBIDA" || resultado.estado === "PROCESANDO") {
+      } else if (
+        resultado.estado === "RECIBIDA" ||
+        resultado.estado === "PROCESANDO"
+      ) {
         ultimoError = `La operación continúa en estado ${resultado.estado}`;
-      } else if (resultado.estado === "NO_ENCONTRADA" || resultado.encontrada === false) {
+      } else if (
+        resultado.estado === "NO_ENCONTRADA" ||
+        resultado.encontrada === false
+      ) {
         ultimoError = "La operación todavía no fue encontrada en WinDev";
       } else {
-        ultimoError = "WinDev devolvió una respuesta inesperada al consultar la operación";
+        ultimoError =
+          "WinDev devolvió una respuesta inesperada al consultar la operación";
       }
     } catch (error) {
-      ultimoError = error.name === "AbortError"
-        ? "Timeout al consultar la operación en WinDev"
-        : error.message;
+      ultimoError =
+        error.name === "AbortError"
+          ? "Timeout al consultar la operación en WinDev"
+          : error.message;
     }
 
     if (intento < INTENTOS_CONFIRMACION_WINDEV) {
@@ -70,7 +83,70 @@ export const consultarOperacionWinDev = async (windevUrl, operacionId) => {
   return { estado: "INCIERTA", error: ultimoError };
 };
 
-export const consultarOperacionWinDevLegacy = async (windevUrl, operacionId) => {
+export const consultarOperacionWinDevParaReconciliacion = async (windevUrl, operacionId) => {
+  let ultimoError = "No se pudo confirmar la operación en WinDev";
+  let ultimoEstadoConfiable = null;
+
+  for (let intento = 1; intento <= INTENTOS_CONFIRMACION_WINDEV; intento++) {
+    try {
+      const response = await fetchConTimeout(
+        `${windevUrl}/apicompras/operaciones/${encodeURIComponent(operacionId)}`,
+        {},
+        TIMEOUT_GET_WINDEV_MS
+      );
+      const resultado = await leerJsonSeguro(response);
+
+      if (!response.ok) {
+        ultimoEstadoConfiable = null;
+        ultimoError = `WinDev respondió HTTP ${response.status} al consultar la operación`;
+      } else if (resultado.operacionID !== operacionId) {
+        ultimoEstadoConfiable = null;
+        ultimoError = "WinDev devolvió un operacionID inesperado";
+      } else if (resultado.ok === true && resultado.estado === "APLICADA") {
+        return { estado: "APLICADA", resultado };
+      } else if (resultado.estado === "ERROR") {
+        return {
+          estado: "ERROR",
+          error: resultado.error || resultado.mensajeError || "WinDev informó un error al procesar la operación",
+          resultado,
+        };
+      } else if (resultado.estado === "NO_ENCONTRADA" || resultado.encontrada === false) {
+        ultimoEstadoConfiable = "NO_ENCONTRADA";
+        ultimoError = "La operación no fue encontrada en WinDev";
+      } else if (resultado.estado === "RECIBIDA" || resultado.estado === "PROCESANDO") {
+        ultimoEstadoConfiable = resultado.estado;
+        ultimoError = `La operación continúa en estado ${resultado.estado}`;
+      } else {
+        ultimoEstadoConfiable = null;
+        ultimoError = "WinDev devolvió una respuesta inesperada al consultar la operación";
+      }
+    } catch (error) {
+      ultimoEstadoConfiable = null;
+      ultimoError = error.name === "AbortError"
+        ? "Timeout al consultar la operación en WinDev"
+        : error.message;
+    }
+
+    if (intento < INTENTOS_CONFIRMACION_WINDEV) {
+      await esperar(DEMORA_CONFIRMACION_WINDEV_MS);
+    }
+  }
+
+  if (ultimoEstadoConfiable === "NO_ENCONTRADA") {
+    return { estado: "NO_ENCONTRADA", error: ultimoError };
+  }
+
+  return {
+    estado: "INCIERTA",
+    estadoWinDev: ultimoEstadoConfiable,
+    error: ultimoError,
+  };
+};
+
+export const consultarOperacionWinDevLegacy = async (
+  windevUrl,
+  operacionId
+) => {
   const confirmacion = await consultarOperacionWinDev(windevUrl, operacionId);
   if (confirmacion.estado === "APLICADA") {
     return { aplicada: true, resultado: confirmacion.resultado };
@@ -83,7 +159,12 @@ export const consultarOperacionWinDevLegacy = async (windevUrl, operacionId) => 
   };
 };
 
-export const ejecutarOperacionWinDev = async ({ windevUrl, endpoint, operacionId, payload }) => {
+export const ejecutarOperacionWinDev = async ({
+  windevUrl,
+  endpoint,
+  operacionId,
+  payload,
+}) => {
   try {
     const response = await fetchConTimeout(
       `${windevUrl}${endpoint}`,
@@ -95,14 +176,24 @@ export const ejecutarOperacionWinDev = async ({ windevUrl, endpoint, operacionId
       TIMEOUT_POST_WINDEV_MS
     );
     const resultado = await leerJsonSeguro(response);
+    const operacionIdCoincide =
+      resultado.operacionID == null || resultado.operacionID === operacionId;
 
-    if (response.ok && resultado.ok === true && resultado.estado === "APLICADA") {
+    if (
+      response.ok &&
+      resultado.ok === true &&
+      resultado.estado === "APLICADA" &&
+      operacionIdCoincide
+    ) {
       return { estado: "APLICADA", resultado };
     }
-    if (resultado.estado === "ERROR") {
+    if (resultado.estado === "ERROR" && operacionIdCoincide) {
       return {
         estado: "ERROR",
-        error: resultado.error || resultado.mensajeError || "WinDev informó un error al procesar la operación",
+        error:
+          resultado.error ||
+          resultado.mensajeError ||
+          "WinDev informó un error al procesar la operación",
         resultado,
       };
     }

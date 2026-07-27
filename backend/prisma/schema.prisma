@@ -91,6 +91,7 @@ model compras_comprobantes {
   updated_at                            DateTime                                @default(now()) @db.Timestamptz(6)
   periodo_fiscal                        String?                                 @db.VarChar(7)
   operacion_id                          String?                                 @unique @db.Uuid
+  estado_integracion                    String                                  @default("NO_REQUIERE") @db.VarChar(20)
   compras_cc_movimientos                compras_cc_movimientos[]
   compras_comprobantes_tipo             compras_comprobantes_tipo               @relation(fields: [comprobante_tipo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   compras_proveedores                   compras_proveedores                     @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

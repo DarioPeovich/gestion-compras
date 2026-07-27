@@ -1,12 +1,26 @@
 import { randomUUID } from 'node:crypto'
 import prisma from '../config/prisma.js'
-import { ejecutarOperacionWinDev } from '../services/windevClient.js'
+import {
+  consultarOperacionWinDevParaReconciliacion,
+  ejecutarOperacionWinDev,
+} from '../services/windevClient.js'
 
 // IDs en tributosSubTabla.fic de HFSQL
 const TRIBUTO_IVA         = 1
 const TRIBUTO_ICL         = 8   // Imp. Combustibles Líquidos (ex-ITC, Ley 27.430)
 const TRIBUTO_IDC         = 9   // Imp. Dióxido de Carbono
 const TRIBUTO_IMP_INTERNO = 4
+const TIMEOUT_TRANSACCION_COMPROBANTE_MS = 40000
+
+class WinDevIntegrationError extends Error {
+  constructor(message, { detalle, operacionId, resultado }) {
+    super(message)
+    this.name = 'WinDevIntegrationError'
+    this.detalle = detalle
+    this.operacionId = operacionId
+    this.resultado = resultado
+  }
+}
 // Percepciones manuales (vienen en body.percepciones[])
 // TRIBUTO_IIBB  = 5  → tributo_id en el array
 // TRIBUTO_MUNIC = 7  → tributo_id en el array
@@ -52,6 +66,108 @@ export const verificarDuplicado = async (req, res, next) => {
     next(error)
   }
 }
+
+const eliminarComprobantePendiente = async (comprobanteId) => {
+  await prisma.$transaction(async (tx) => {
+    await tx.compras_cc_movimientos.deleteMany({
+      where: { comprobante_id: comprobanteId },
+    })
+    await tx.compras_comprobantes.delete({
+      where: {
+        id: comprobanteId,
+        estado_integracion: 'PENDIENTE',
+      },
+    })
+  })
+}
+
+// =============================================================================
+// GET /api/comprobantes/reconciliar-pendientes
+// =============================================================================
+export const reconciliarPendientes = async (req, res, next) => {
+  try {
+    const pendientes = await prisma.compras_comprobantes.findMany({
+      where: {
+        estado_integracion: 'PENDIENTE',
+        operacion_id: { not: null },
+      },
+      include: {
+        compras_proveedores: { select: { razon_social: true } },
+        compras_comprobantes_tipo: { select: { descrip_abrev: true } },
+      },
+      orderBy: { id: 'asc' },
+    })
+
+    if (pendientes.length === 0) {
+      return res.json({ ok: true, hayPendientes: false, resueltos: [] })
+    }
+
+    const WINDEV_URL = process.env.WINDEV_API_URL
+    if (!WINDEV_URL) {
+      return res.json({
+        ok: true,
+        hayPendientes: true,
+        pendientes: pendientes.map(formatearComprobantePendiente),
+        resueltos: [],
+      })
+    }
+
+    const resueltos = []
+    const noResueltos = []
+
+    for (const comprobante of pendientes) {
+      const resultado = await consultarOperacionWinDevParaReconciliacion(
+        WINDEV_URL,
+        comprobante.operacion_id
+      )
+
+      if (resultado.estado === 'APLICADA') {
+        const resultadoWinDev = resultado.resultado
+        const actualizoStock =
+          Number(resultadoWinDev?.stockMovId || 0) > 0 ||
+          Number(resultadoWinDev?.itemsStockProcesados || 0) > 0
+
+        await prisma.compras_comprobantes.update({
+          where: { id: comprobante.id },
+          data: {
+            estado_integracion: 'APLICADA',
+            fecha_actualizacion_stock: actualizoStock ? new Date() : null,
+          },
+        })
+        resueltos.push({ id: comprobante.id, estado: 'APLICADA' })
+        continue
+      }
+
+      if (resultado.estado === 'ERROR' || resultado.estado === 'NO_ENCONTRADA') {
+        await eliminarComprobantePendiente(comprobante.id)
+        resueltos.push({ id: comprobante.id, estado: resultado.estado, eliminado: true })
+        continue
+      }
+
+      noResueltos.push(formatearComprobantePendiente(comprobante))
+    }
+
+    res.json({
+      ok: true,
+      hayPendientes: noResueltos.length > 0,
+      pendientes: noResueltos,
+      resueltos,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+const formatearComprobantePendiente = (comprobante) => ({
+  id: comprobante.id,
+  proveedor: comprobante.compras_proveedores.razon_social,
+  tipo: comprobante.compras_comprobantes_tipo.descrip_abrev,
+  puntoVenta: comprobante.punto_venta,
+  numero: comprobante.numero_comprobante,
+  fecha: comprobante.fecha,
+  total: comprobante.total,
+  operacionID: comprobante.operacion_id,
+})
 
 // =============================================================================
 // POST /api/comprobantes/registrar
@@ -116,7 +232,25 @@ export const registrarComprobante = async (req, res, next) => {
         select: { hfsql_proveedores_id: true },
       })
       proveedorHfsqlId = proveedor?.hfsql_proveedores_id
-
+    }
+    const WINDEV_URL = process.env.WINDEV_API_URL
+    if (hayIntegracionWinDev && (!hfsqlTipoId || !proveedorHfsqlId)) {
+      return res.status(502).json({
+        ok: false,
+        error: 'No se pudo iniciar la integración con WinDev',
+        detalle: 'No se encontró la configuración HFSQL del tipo de comprobante o del proveedor',
+        operacionID: operacionId,
+        estadoIntegracion: 'ERROR',
+      })
+    }
+    if (hayIntegracionWinDev && !WINDEV_URL) {
+      return res.status(502).json({
+        ok: false,
+        error: 'No se pudo iniciar la integración con WinDev',
+        detalle: 'La API WinDev no está configurada',
+        operacionID: operacionId,
+        estadoIntegracion: 'ERROR',
+      })
     }
 
     // ── Subtotal desde líneas o desde body ───────────────────────────────
@@ -182,6 +316,7 @@ export const registrarComprobante = async (req, res, next) => {
           saldo:               totalCalc,
           estado:              'CONFIRMADO',
           operacion_id:        operacionId,
+          estado_integracion:  hayIntegracionWinDev ? 'PENDIENTE' : 'NO_REQUIERE',
           observaciones:       observaciones || null,
           usuario_id:          Number(usuario_id),
         }
@@ -276,126 +411,125 @@ export const registrarComprobante = async (req, res, next) => {
         })
       }
 
-      return comprobante
-    }) // fin $transaction
+      let integracion = null
+      let comprobanteFinal = comprobante
 
-    // ── WinDev: actualizar costos ─────────────────────────────────────────
-    let integracion = null
-
-    // ── WinDev: actualizar stock ──────────────────────────────────────────
-    if (hayIntegracionWinDev) {
-      const WINDEV_URL = process.env.WINDEV_API_URL
-      if (!hfsqlTipoId || !proveedorHfsqlId) {
-        return res.status(502).json({
-          ok: false,
-          error: 'No se pudo iniciar la integración con WinDev',
-          detalle: 'No se encontró la configuración HFSQL del tipo de comprobante o del proveedor',
+      if (hayIntegracionWinDev) {
+        const payload = {
           operacionID: operacionId,
-          estadoIntegracion: 'ERROR',
+          tipoOperacion: 'ACTUALIZAR_ARTICULOS_STOCK',
+          tipoEntidad: 'COMPROBANTE_COMPRA',
+          entidadID: comprobante.id,
+          comprobanteTipoId: hfsqlTipoId,
+          depositoId: actualizarStock ? depositoId : 0,
+          factor,
+          usuarioId: Number(usuario_id),
+          usuarioNombre: req.body.usuario_nombre || '',
+          observaciones: observaciones || `${tipo.descrip_abrev} ${String(punto_venta).padStart(4,'0')}-${String(numero_comprobante).padStart(8,'0')}`,
+          puntoVenta: Number(punto_venta) || 0,
+          nroComprobante: Number(numero_comprobante) || 0,
+          actualizarStock,
+          items: itemsReales.map(i => {
+            const cantidad = Number(i.cantidad) || 1
+            const iclUnit = Number(i.importe_icl || 0) / cantidad
+            const idcUnit = Number(i.importe_idc || 0) / cantidad
+            const esCombustible = iclUnit > 0 || idcUnit > 0
+
+            return {
+              articulosID: Number(i.hfsql_articulos_id),
+              descripcion: String(i.articulo_descrip),
+              cantidad: Number(i.cantidad),
+              precioCosto: Number(i.precio_costo),
+              actualizarCosto: i.actualizar_costo === true,
+              proveedoresID: Number(proveedorHfsqlId),
+              impTransfComb: iclUnit,
+              impDioxidoCarbono: idcUnit,
+              impInternoMonto: esCombustible
+                ? iclUnit + idcUnit
+                : Number(i.importe_imp_interno || 0) / cantidad,
+              ivaTiposID: Number(i.iva_tipo_id) || 0,
+            }
+          }),
+        }
+
+        integracion = await ejecutarOperacionWinDev({
+          windevUrl: WINDEV_URL,
+          endpoint: '/apicompras/comprobantes/actualizar-articulos-stock',
+          operacionId,
+          payload,
         })
-      }
-      if (!WINDEV_URL) {
-        return res.status(502).json({
-          ok: false,
-          error: 'No se pudo iniciar la integración con WinDev',
-          detalle: 'La API WinDev no está configurada',
-          operacionID: operacionId,
-          estadoIntegracion: 'ERROR',
-        })
-      }
 
-      const payload = {
-        operacionID: operacionId,
-        tipoOperacion: 'ACTUALIZAR_ARTICULOS_STOCK',
-        tipoEntidad: 'COMPROBANTE_COMPRA',
-        entidadID: resultado.id,
-        comprobanteTipoId: hfsqlTipoId,
-        depositoId: actualizarStock ? depositoId : 0,
-        factor,
-        usuarioId: Number(usuario_id),
-        usuarioNombre: req.body.usuario_nombre || '',
-        observaciones: observaciones || `${tipo.descrip_abrev} ${String(punto_venta).padStart(4,'0')}-${String(numero_comprobante).padStart(8,'0')}`,
-        puntoVenta: Number(punto_venta) || 0,
-        nroComprobante: Number(numero_comprobante) || 0,
-        actualizarStock,
-        items: itemsReales.map(i => {
-          const cantidad = Number(i.cantidad) || 1
-          const iclUnit = Number(i.importe_icl || 0) / cantidad
-          const idcUnit = Number(i.importe_idc || 0) / cantidad
-          const esCombustible = iclUnit > 0 || idcUnit > 0
+        if (integracion.estado === 'ERROR') {
+          throw new WinDevIntegrationError(
+            'WinDev rechazó la actualización de artículos y stock',
+            {
+              detalle: integracion.error,
+              operacionId,
+              resultado: integracion.resultado,
+            }
+          )
+        }
 
-          return {
-            articulosID: Number(i.hfsql_articulos_id),
-            descripcion: String(i.articulo_descrip),
-            cantidad: Number(i.cantidad),
-            precioCosto: Number(i.precio_costo),
-            actualizarCosto: i.actualizar_costo === true,
-            proveedoresID: Number(proveedorHfsqlId),
-            impTransfComb: iclUnit,
-            impDioxidoCarbono: idcUnit,
-            impInternoMonto: esCombustible
-              ? iclUnit + idcUnit
-              : Number(i.importe_imp_interno || 0) / cantidad,
-            ivaTiposID: Number(i.iva_tipo_id) || 0,
-          }
-        }),
+        if (integracion.estado === 'APLICADA') {
+          comprobanteFinal = await tx.compras_comprobantes.update({
+            where: { id: comprobante.id },
+            data: {
+              estado_integracion: 'APLICADA',
+              fecha_actualizacion_stock: actualizarStock ? new Date() : null,
+            },
+          })
+        }
       }
 
-      integracion = await ejecutarOperacionWinDev({
-        windevUrl: WINDEV_URL,
-        endpoint: '/apicompras/comprobantes/actualizar-articulos-stock',
-        operacionId,
-        payload,
-      })
-
-      if (integracion.estado === 'ERROR') {
-        return res.status(502).json({
-          ok: false,
-          error: 'WinDev rechazó la actualización de artículos y stock',
-          detalle: integracion.error,
-          operacionID: operacionId,
-          estadoIntegracion: 'ERROR',
-          resultadoIntegracion: integracion.resultado,
-        })
+      return {
+        comprobante: comprobanteFinal,
+        integracion,
+        estadoIntegracion: hayIntegracionWinDev
+          ? integracion.estado === 'APLICADA' ? 'APLICADA' : 'PENDIENTE'
+          : 'NO_REQUIERE',
       }
-
-      if (integracion.estado === 'INCIERTA') {
-        return res.status(502).json({
-          ok: false,
-          error: 'El resultado de la integración con WinDev es incierto',
-          detalle: `${integracion.error}. Debe consultarse la operación con el mismo UUID.`,
-          operacionID: operacionId,
-          estadoIntegracion: 'INCIERTA',
-        })
-      }
-
-      if (
-        actualizarStock &&
-        integracion?.estado === 'APLICADA'
-      ) {
-        await prisma.compras_comprobantes.update({
-          where: { id: resultado.id },
-          data: { fecha_actualizacion_stock: new Date() },
-        })
-      }
-    }
+    }, { timeout: TIMEOUT_TRANSACCION_COMPROBANTE_MS }) // fin $transaction
 
     // ── Respuesta ─────────────────────────────────────────────────────────
+    const comprobanteRespuesta = {
+      id: resultado.comprobante.id,
+      comprobante_tipo: tipo.descrip_abrev,
+      total: totalCalc,
+      saldo: totalCalc,
+      estado: 'CONFIRMADO',
+    }
+
+    if (resultado.estadoIntegracion === 'PENDIENTE') {
+      return res.status(202).json({
+        ok: true,
+        registrado: true,
+        comprobante: comprobanteRespuesta,
+        operacionID: operacionId,
+        estadoIntegracion: 'PENDIENTE',
+        mensaje: 'El comprobante fue registrado, pero la integración no pudo confirmarse',
+      })
+    }
+
     res.status(201).json({
-      ok:   true,
-      data: {
-        id:               resultado.id,
-        comprobante_tipo: tipo.descrip_abrev,
-        total:            totalCalc,
-        saldo:            totalCalc,
-        estado:           'CONFIRMADO',
-        operacionID:      operacionId,
-        estadoIntegracion: integracion?.estado,
-        resultadoIntegracion: integracion?.resultado,
-      }
+      ok: true,
+      comprobante: comprobanteRespuesta,
+      operacionID: operacionId || undefined,
+      estadoIntegracion: resultado.estadoIntegracion,
+      resultadoIntegracion: resultado.integracion?.resultado,
     })
 
   } catch (error) {
+    if (error instanceof WinDevIntegrationError) {
+      return res.status(502).json({
+        ok: false,
+        error: error.message,
+        detalle: error.detalle,
+        estadoIntegracion: 'ERROR',
+        operacionID: error.operacionId,
+        resultadoIntegracion: error.resultado,
+      })
+    }
+
     if (error.code === 'P2002') {
       return res.status(409).json({
         ok:    false,
