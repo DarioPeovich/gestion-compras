@@ -72,6 +72,15 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
 
   const buscar = async () => {
     if (!texto.trim()) return;
+    const textoBusqueda = texto.trim();
+    if (modo === "codSes") {
+      const articuloId = Number(textoBusqueda);
+      if (!/^\d+$/.test(textoBusqueda) || !Number.isSafeInteger(articuloId) || articuloId <= 0) {
+        setResultados([]);
+        setErrorBusqueda("El Código SES debe ser un entero positivo");
+        return;
+      }
+    }
     setBuscando(true);
     setErrorBusqueda("");
     try {
@@ -83,11 +92,17 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
       if (modo === "codProveedor")
         url = `${API_URL}/articulos/por-proveedor/${proveedorId}/${encodeURIComponent(texto)}`;
       if (modo === "codSes")
-        url = `${API_URL}/articulos/por-id/${proveedorId}/${encodeURIComponent(texto)}`;
+        url = `${API_URL}/articulos/por-codigo-ses/${proveedorId}/${encodeURIComponent(textoBusqueda)}`;
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error("Error al buscar artículos");
-      const lista = Array.isArray(data.data) ? data.data : data.data ? [data.data] : [];
+      const lista = Array.isArray(data)
+        ? data
+        : Array.isArray(data.data)
+          ? data.data
+          : data.data
+            ? [data.data]
+            : [];
       if (lista.length === 1) {
         onSeleccionar(lista[0]);
         setTexto("");
@@ -112,6 +127,7 @@ export default function BuscadorArticulos({ proveedorId, onSeleccionar }) {
           value={modo}
           onChange={(e) => {
             setModo(e.target.value);
+            setTexto("");
             setResultados([]);
             setErrorBusqueda("");
           }}

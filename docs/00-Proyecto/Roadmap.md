@@ -7,7 +7,7 @@ Versión del producto:
 Compras v1.1.0
 
 Próximo objetivo:
-Órdenes de Compra
+Orden de Pago
 
 Estado general:
 🟡 Desarrollo activo
@@ -44,13 +44,21 @@ Versión del módulo: Compras v1.1.0
 
 ✔ Remitos
 
-✔ Integración Node ↔ WinDev
+✔ Integración idempotente de comprobantes — FINALIZADA
 
-✔ Protocolo de idempotencia
+✔ Operación unificada costo/stock, `operacionID`, rollback, reconciliación y bloqueo operativo
 
 ✔ Documentación base
 
 ✔ Consolidación estructural del Frontend v1
+
+La integración de comprobantes quedó completamente implementada y validada. `operacionID`, rollback transaccional, reconciliación y bloqueo operativo no forman parte del trabajo pendiente.
+
+Prioridad funcional vigente:
+
+1. Orden de Pago.
+2. Cuenta Corriente de Proveedores.
+3. Órdenes de Compra, postergada.
 
 ---
 
@@ -87,7 +95,7 @@ Mejoras incrementales pendientes
 - Sustitución del `window.confirm` del cambio de modo detallado/simplificado.
 - Confirmación definitiva del mapeo del id de artículo en Remitos.
 - Asociación de Remitos con Facturas y Órdenes de Compra.
-- Reversa o anulación de stock y compensación de resultados inciertos de WinDev.
+- Reversa o anulación de stock y reconciliación de Remitos bajo el mecanismo definitivo de comprobantes.
 - Documentación detallada del frontend y documentación final DOCX.
 
 Validación
@@ -113,7 +121,7 @@ Implementar el flujo documental de generación y administración de órdenes de 
 
 Estado
 
-⚪ No iniciado
+⚪ Postergada
 
 ---
 
@@ -143,11 +151,11 @@ Estado
 
 # Etapa 5
 
-Pagos a Proveedores
+Orden de Pago
 
 Estado
 
-⚪ No iniciado
+⚪ Próximo objetivo
 
 ---
 

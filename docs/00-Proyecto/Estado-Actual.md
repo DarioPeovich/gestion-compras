@@ -20,8 +20,9 @@ Estado aproximado: **80 %**
 - Remitos
 - Actualización de costos
 - Actualización de stock
-- Integración Node ↔ WinDev
-- Protocolo de idempotencia
+- Integración Node ↔ WinDev para comprobantes, implementada y validada
+- Protocolo idempotente de comprobantes finalizado
+- Verificación transversal de disponibilidad mediante `GET /api/status`
 
 ### Pendiente
 
@@ -31,6 +32,7 @@ Estado aproximado: **80 %**
 - Pagos
 - OCR
 - Libro IVA Compras
+- Etapa 2 de disponibilidad: `GET /api/status/windev`, condicionada a un endpoint específico en Gestión Ventas y destinada únicamente a procesos que dependan de WinDev
 
 ---
 
@@ -126,7 +128,48 @@ Para Facturas y Notas de Crédito, Total Factura es obligatorio, debe ser positi
 
 ## Integración Node ↔ WinDev
 
-El flujo React → Node → PostgreSQL → WinDev → HFSQL está operativo para Remitos, con idempotencia y consulta de recuperación. Permanecen pendientes la reversa o anulación de stock y los mecanismos automáticos de reintento o compensación ante resultados inciertos.
+La integración de comprobantes de compra está **finalizada, implementada y validada**. El flujo unifica la actualización selectiva de costos y la actualización global de stock mediante un único endpoint WinDev y un solo `operacionID` UUID compartido con PostgreSQL.
+
+Se encuentran implementados:
+
+- endpoint único `POST /apicompras/comprobantes/actualizar-articulos-stock`;
+- protocolo idempotente sin repetición automática del POST;
+- transacción PostgreSQL con rollback completo ante `ERROR` definitivo;
+- estados persistibles `NO_REQUIERE`, `PENDIENTE` y `APLICADA`;
+- persistencia `PENDIENTE` exclusivamente cuando el resultado es incierto;
+- reconciliación al pulsar `+ Nuevo comprobante` y `Volver a verificar`;
+- consultas de reconciliación exclusivamente mediante GET y con el mismo UUID;
+- eliminación transaccional ante `ERROR` o `NO_ENCONTRADA` confirmados;
+- bloqueo preventivo de nuevas altas mientras persista un pendiente;
+- diálogo operativo con las acciones `Cerrar` y `Volver a verificar`;
+- pruebas automatizadas y pruebas manuales integrales validadas.
+
+El protocolo transaccional y de reconciliación descrito corresponde a comprobantes. Remitos conserva su flujo específico y no debe considerarse implementado con exactamente el mismo mecanismo.
+
+### Disponibilidad de SES Compras
+
+La Etapa 1 de disponibilidad se encuentra implementada y forma parte de la arquitectura operativa. El endpoint transversal:
+
+```text
+GET /api/status
+```
+
+verifica que SES Compras API esté disponible y comprueba la conectividad con PostgreSQL mediante Prisma. Su respuesta representa exclusivamente el estado de SES Compras: no verifica Gestión Ventas ni otras integraciones externas.
+
+El frontend utiliza actualmente esta comprobación antes de iniciar Nuevo Comprobante:
+
+```text
+Usuario
+  -> Nuevo Comprobante
+  -> GET /api/status
+  -> si SES Compras está disponible
+  -> reconciliación de pendientes
+  -> apertura del formulario
+```
+
+Si SES Compras no está disponible, el flujo se interrumpe antes de ejecutar procesos funcionales y el operador recibe un mensaje específico de disponibilidad. De esta forma, una caída de Node ya no se presenta como un problema de Gestión Ventas.
+
+Permanece pendiente únicamente la segunda etapa de disponibilidad, `GET /api/status/windev`. Requerirá un endpoint específico en Gestión Ventas y se utilizará sólo en módulos o procesos que dependan realmente de WinDev.
 
 ## Deuda técnica externa — WinDev
 

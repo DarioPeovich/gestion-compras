@@ -931,11 +931,11 @@ export default function NuevoComprobante({ onCancelar }) {
       }
 
       alert(
-        `Comprobante #${data.data.id} registrado. Total: $${Number(data.data.total).toLocaleString("es-AR", { minimumFractionDigits: 3 })}`
+        `Comprobante #${data.comprobante.id} registrado. Total: $${Number(data.comprobante.total).toLocaleString("es-AR", { minimumFractionDigits: 3 })}`
       );
       onCancelar();
     } catch (err) {
-      alert("Error de conexión: " + err.message);
+      alert("Error al registrar el comprobante: " + err.message);
     } finally {
       setCargando(false);
     }

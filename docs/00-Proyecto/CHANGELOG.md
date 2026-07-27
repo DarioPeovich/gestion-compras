@@ -1,5 +1,40 @@
 # v1.1.0 — 18/07/2026
 
+## Integración Node ↔ WinDev
+
+- Se unificó la actualización selectiva de costos y la actualización de stock en una sola operación WinDev.
+- Se incorporó un `operacionID` UUID persistente y compartido entre PostgreSQL y WinDev.
+- El alta de comprobantes quedó integrada dentro de una única transacción Prisma.
+- Los rechazos definitivos de WinDev provocan rollback completo de PostgreSQL.
+- Se formalizaron los estados persistibles `NO_REQUIERE`, `PENDIENTE` y `APLICADA`; `ERROR` no se persiste.
+- Se incorporó reconciliación automática al intentar iniciar un nuevo comprobante, utilizando exclusivamente consultas GET.
+- Las operaciones confirmadas como `ERROR` o `NO_ENCONTRADA` durante la reconciliación eliminan transaccionalmente el comprobante y sus dependencias.
+- Mientras exista una operación pendiente no resuelta, el ingreso queda bloqueado preventivamente y el operador dispone de `Cerrar` y `Volver a verificar`.
+- Se validó integralmente el protocolo mediante pruebas automatizadas y pruebas manuales de alta, rollback, incertidumbre, reconciliación y eliminación.
+
+## Disponibilidad de SES Compras (Etapa 1)
+
+Se implementó la verificación transversal de disponibilidad mediante:
+
+```text
+GET /api/status
+```
+
+Incluye:
+
+- verificación de disponibilidad de SES Compras API;
+- comprobación liviana de conectividad con PostgreSQL utilizando Prisma;
+- separación entre disponibilidad del sistema y procesos funcionales;
+- servicio reutilizable de consulta desde el frontend;
+- integración inicial en el flujo de Nuevo Comprobante;
+- verificación previa antes de ejecutar la reconciliación de comprobantes pendientes;
+- interrupción temprana del flujo cuando SES Compras no está disponible;
+- mensaje específico para la indisponibilidad de SES Compras;
+- eliminación de la confusión entre una caída del backend Node y un problema de Gestión Ventas;
+- manejo defensivo cuando falla la comprobación de disponibilidad o la reconciliación.
+
+La Etapa 2, `GET /api/status/windev`, permanece pendiente, requerirá un endpoint específico de estado en Gestión Ventas y no forma parte de esta versión.
+
 ## Consolidación del Frontend v1
 
 ### Agregado

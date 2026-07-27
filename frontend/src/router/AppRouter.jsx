@@ -6,6 +6,13 @@ import ProveedoresList from '../components/proveedores/ProveedoresList.jsx'
 import ArticulosList from '../components/articulos/ArticulosList.jsx'
 import NuevoComprobante from '../components/comprobantes/NuevoComprobante.jsx'
 import UIDesign from '../components/ui/UIDesign.jsx'
+import SESConfirmDialog from '../components/ui/feedback/SESConfirmDialog.jsx'
+import {
+  MOTIVOS_INDISPONIBILIDAD,
+  verificarDisponibilidadCompras,
+} from '../services/disponibilidadService.js'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 function Layout({ children }) {
   return (
@@ -89,6 +96,68 @@ function Layout({ children }) {
 function ComprobantesPage() {
 
   const [modo, setModo] = useState('lista')
+  const [verificandoPendientes, setVerificandoPendientes] = useState(false)
+  const [avisoPendientes, setAvisoPendientes] = useState(null)
+  const [avisoDisponibilidad, setAvisoDisponibilidad] = useState(null)
+
+  const verificarPendientes = async () => {
+    setVerificandoPendientes(true)
+    setAvisoPendientes(null)
+    try {
+      const disponibilidad = await verificarDisponibilidadCompras()
+      if (!disponibilidad.disponible) {
+        setAvisoDisponibilidad(disponibilidad.motivo)
+        return
+      }
+
+      setAvisoDisponibilidad(null)
+      const response = await fetch(`${API_URL}/comprobantes/reconciliar-pendientes`)
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        setAvisoDisponibilidad(MOTIVOS_INDISPONIBILIDAD.RESPUESTA_INVALIDA)
+        return
+      }
+
+      if (!response.ok || !data.ok) {
+        setAvisoDisponibilidad(MOTIVOS_INDISPONIBILIDAD.RESPUESTA_INVALIDA)
+        return
+      }
+
+      if (!data.hayPendientes) {
+        setAvisoPendientes(null)
+        setModo('nuevo')
+        return
+      }
+
+      setAvisoPendientes(data.pendientes || [])
+    } catch {
+      setAvisoDisponibilidad(MOTIVOS_INDISPONIBILIDAD.BACKEND_NO_DISPONIBLE)
+    } finally {
+      setVerificandoPendientes(false)
+    }
+  }
+
+  const detallePendientes = avisoPendientes?.length
+    ? avisoPendientes.map((pendiente) =>
+        `Comprobante pendiente\n\nID: ${pendiente.id}\nProveedor: ${pendiente.proveedor}\nTipo: ${pendiente.tipo}\nNúmero: ${pendiente.puntoVenta}-${pendiente.numero}\nTotal: $${Number(pendiente.total).toLocaleString('es-AR')}\nOperación: ${pendiente.operacionID}`
+      ).join('\n\n')
+    : 'No se pudieron obtener los datos del comprobante pendiente.'
+
+  const mensajePendientes = (
+    <>
+      {`No fue posible confirmar una operación pendiente porque el servicio Gestión Ventas no está respondiendo.\n\nPara preservar la consistencia de la información, el ingreso de nuevos comprobantes permanecerá temporalmente bloqueado hasta verificar el estado de esta operación.\n\n${detallePendientes}\n\nComuníquese con el responsable del sistema.`.split('\n').map((linea, index) => (
+        <span key={`${index}-${linea}`}>
+          {linea}<br />
+        </span>
+      ))}
+    </>
+  )
+
+  const mensajeDisponibilidad = avisoDisponibilidad === MOTIVOS_INDISPONIBILIDAD.DATABASE_NO_DISPONIBLE
+    ? 'SES Compras no puede acceder temporalmente a la información del sistema.\n\nLa operación no puede continuar.\n\nComuníquese con el responsable del sistema.'
+    : 'No fue posible comunicarse con el servidor de SES Compras.\n\nEl ingreso de nuevos comprobantes no puede continuar mientras el servicio no esté disponible.\n\nVerifique que el servicio se encuentre iniciado o comuníquese con el responsable del sistema.'
 
   if (modo === 'nuevo') {
     return <NuevoComprobante onCancelar={() => setModo('lista')} />
@@ -104,10 +173,11 @@ function ComprobantesPage() {
         </h2>
 
         <button
-          onClick={() => setModo('nuevo')}
+          onClick={verificarPendientes}
+          disabled={verificandoPendientes}
           className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"
         >
-          + Nuevo comprobante
+          {verificandoPendientes ? 'Verificando...' : '+ Nuevo comprobante'}
         </button>
 
       </div>
@@ -117,6 +187,32 @@ function ComprobantesPage() {
           No hay comprobantes registrados todavía.
         </p>
       </div>
+
+      <SESConfirmDialog
+        open={avisoPendientes !== null}
+        title="Operación pendiente"
+        message={mensajePendientes}
+        confirmLabel="Volver a verificar"
+        cancelLabel="Cerrar"
+        loading={verificandoPendientes}
+        onConfirm={verificarPendientes}
+        onCancel={() => setAvisoPendientes(null)}
+      />
+
+      <SESConfirmDialog
+        open={avisoDisponibilidad !== null}
+        title="Servicio de Compras no disponible"
+        message={mensajeDisponibilidad.split('\n').map((linea, index) => (
+          <span key={`${index}-${linea}`}>
+            {linea}<br />
+          </span>
+        ))}
+        confirmLabel="Volver a intentar"
+        cancelLabel="Cerrar"
+        loading={verificandoPendientes}
+        onConfirm={verificarPendientes}
+        onCancel={() => setAvisoDisponibilidad(null)}
+      />
 
     </div>
   )

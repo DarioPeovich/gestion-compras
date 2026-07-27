@@ -7,6 +7,7 @@ import remitosRouter from './src/routes/remitos.routes.js'
 import sucursalesRoutes from './src/routes/sucursales.routes.js'
 import ivaTiposRouter from './src/routes/iva-tipos.routes.js'
 import syncRouter from './src/routes/sync.routes.js'
+import statusRouter from './src/routes/status.routes.js'
 import { inicializarArticulos } from './src/jobs/cargaArticulos.js'
 
 import testRouter from './src/routes/test.routes.js'    //Solo para pruebas
@@ -21,6 +22,7 @@ app.use(cors())
 app.use(express.json())
 
 // Rutas
+app.use('/api/status', statusRouter)
 app.use('/api/proveedores', proveedoresRouter)
 app.use('/api/sync', syncRouter)
 app.use('/api/test', testRouter)
