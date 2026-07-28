@@ -10,6 +10,7 @@ import SESConfirmDialog from '../components/ui/feedback/SESConfirmDialog.jsx'
 import {
   MOTIVOS_INDISPONIBILIDAD,
   verificarDisponibilidadCompras,
+  verificarDisponibilidadGestionVentas,
 } from '../services/disponibilidadService.js'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
@@ -99,10 +100,13 @@ function ComprobantesPage() {
   const [verificandoPendientes, setVerificandoPendientes] = useState(false)
   const [avisoPendientes, setAvisoPendientes] = useState(null)
   const [avisoDisponibilidad, setAvisoDisponibilidad] = useState(null)
+  const [avisoGestionVentas, setAvisoGestionVentas] = useState(null)
 
   const verificarPendientes = async () => {
     setVerificandoPendientes(true)
     setAvisoPendientes(null)
+    setAvisoDisponibilidad(null)
+    setAvisoGestionVentas(null)
     try {
       const disponibilidad = await verificarDisponibilidadCompras()
       if (!disponibilidad.disponible) {
@@ -111,6 +115,13 @@ function ComprobantesPage() {
       }
 
       setAvisoDisponibilidad(null)
+      const disponibilidadGestionVentas = await verificarDisponibilidadGestionVentas()
+      if (!disponibilidadGestionVentas.disponible) {
+        setAvisoGestionVentas(disponibilidadGestionVentas.motivo)
+        return
+      }
+
+      setAvisoGestionVentas(null)
       const response = await fetch(`${API_URL}/comprobantes/reconciliar-pendientes`)
       let data
       try {
@@ -158,6 +169,14 @@ function ComprobantesPage() {
   const mensajeDisponibilidad = avisoDisponibilidad === MOTIVOS_INDISPONIBILIDAD.DATABASE_NO_DISPONIBLE
     ? 'SES Compras no puede acceder temporalmente a la información del sistema.\n\nLa operación no puede continuar.\n\nComuníquese con el responsable del sistema.'
     : 'No fue posible comunicarse con el servidor de SES Compras.\n\nEl ingreso de nuevos comprobantes no puede continuar mientras el servicio no esté disponible.\n\nVerifique que el servicio se encuentre iniciado o comuníquese con el responsable del sistema.'
+
+  const gestionVentasNoDisponible = avisoGestionVentas === MOTIVOS_INDISPONIBILIDAD.HFSQL_NO_DISPONIBLE
+  const tituloGestionVentas = gestionVentasNoDisponible
+    ? 'Gestión Ventas no disponible'
+    : 'No fue posible verificar Gestión Ventas'
+  const mensajeGestionVentas = gestionVentasNoDisponible
+    ? 'Gestión Ventas está activa, pero no puede acceder temporalmente a la información del sistema.\n\nEl ingreso de nuevos comprobantes no puede continuar hasta restablecer la conexión.\n\nComuníquese con el responsable del sistema.'
+    : 'No fue posible confirmar la disponibilidad del servicio Gestión Ventas.\n\nEl ingreso de nuevos comprobantes no puede continuar hasta verificar el estado del servicio.\n\nComuníquese con el responsable del sistema.'
 
   if (modo === 'nuevo') {
     return <NuevoComprobante onCancelar={() => setModo('lista')} />
@@ -212,6 +231,21 @@ function ComprobantesPage() {
         loading={verificandoPendientes}
         onConfirm={verificarPendientes}
         onCancel={() => setAvisoDisponibilidad(null)}
+      />
+
+      <SESConfirmDialog
+        open={avisoGestionVentas !== null}
+        title={tituloGestionVentas}
+        message={mensajeGestionVentas.split('\n').map((linea, index) => (
+          <span key={`${index}-${linea}`}>
+            {linea}<br />
+          </span>
+        ))}
+        confirmLabel="Volver a intentar"
+        cancelLabel="Cerrar"
+        loading={verificandoPendientes}
+        onConfirm={verificarPendientes}
+        onCancel={() => setAvisoGestionVentas(null)}
       />
 
     </div>

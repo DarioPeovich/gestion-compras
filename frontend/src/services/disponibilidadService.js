@@ -4,6 +4,8 @@ export const MOTIVOS_INDISPONIBILIDAD = {
   BACKEND_NO_DISPONIBLE: 'BACKEND_NO_DISPONIBLE',
   DATABASE_NO_DISPONIBLE: 'DATABASE_NO_DISPONIBLE',
   RESPUESTA_INVALIDA: 'RESPUESTA_INVALIDA',
+  HFSQL_NO_DISPONIBLE: 'HFSQL_NO_DISPONIBLE',
+  WINDEV_NO_VERIFICADA: 'WINDEV_NO_VERIFICADA',
 }
 
 export const verificarDisponibilidadCompras = async () => {
@@ -50,5 +52,72 @@ export const verificarDisponibilidadCompras = async () => {
   return {
     disponible: false,
     motivo: MOTIVOS_INDISPONIBILIDAD.RESPUESTA_INVALIDA,
+  }
+}
+
+export const verificarDisponibilidadGestionVentas = async () => {
+  let response
+
+  try {
+    response = await fetch(`${API_URL}/status/windev`)
+  } catch {
+    return {
+      disponible: false,
+      motivo: MOTIVOS_INDISPONIBILIDAD.WINDEV_NO_VERIFICADA,
+      databaseEstado: 'NO_VERIFICADA',
+    }
+  }
+
+  let data
+  try {
+    data = await response.json()
+  } catch {
+    return {
+      disponible: false,
+      motivo: MOTIVOS_INDISPONIBILIDAD.WINDEV_NO_VERIFICADA,
+      databaseEstado: 'NO_VERIFICADA',
+    }
+  }
+
+  const contratoValido =
+    typeof data?.servicio === 'string' &&
+    typeof data?.estado === 'string' &&
+    typeof data?.database?.estado === 'string'
+
+  if (!contratoValido) {
+    return {
+      disponible: false,
+      motivo: MOTIVOS_INDISPONIBILIDAD.WINDEV_NO_VERIFICADA,
+      databaseEstado: 'NO_VERIFICADA',
+    }
+  }
+
+  if (
+    response.ok &&
+    data?.estado === 'ACTIVO' &&
+    data?.database?.estado === 'ACTIVA'
+  ) {
+    return {
+      disponible: true,
+      motivo: null,
+      databaseEstado: 'ACTIVA',
+    }
+  }
+
+  if (
+    data.estado === 'NO_DISPONIBLE' &&
+    data.database.estado === 'NO_DISPONIBLE'
+  ) {
+    return {
+      disponible: false,
+      motivo: MOTIVOS_INDISPONIBILIDAD.HFSQL_NO_DISPONIBLE,
+      databaseEstado: 'NO_DISPONIBLE',
+    }
+  }
+
+  return {
+    disponible: false,
+    motivo: MOTIVOS_INDISPONIBILIDAD.WINDEV_NO_VERIFICADA,
+    databaseEstado: 'NO_VERIFICADA',
   }
 }
