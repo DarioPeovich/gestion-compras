@@ -35,6 +35,27 @@ Incluye:
 
 La Etapa 2, `GET /api/status/windev`, permanece pendiente, requerirá un endpoint específico de estado en Gestión Ventas y no forma parte de esta versión.
 
+## Infraestructura de disponibilidad de servicios
+
+### Backend
+
+- Se implementó el endpoint general `GET /api/status`.
+- Se implementó el endpoint específico `GET /api/status/windev`.
+- La disponibilidad de PostgreSQL se verifica de manera independiente mediante Prisma.
+- La disponibilidad de Gestión Ventas y HFSQL se verifica de manera independiente del estado general de SES Compras.
+- Se normalizaron los estados `ACTIVO`, `NO_DISPONIBLE` y `NO_VERIFICADA` para diferenciar servicio operativo, base no disponible y estado no verificable.
+
+### Frontend
+
+- Se incorporó la verificación previa de disponibilidad antes de iniciar Nuevo Comprobante.
+- Se presentan mensajes específicos cuando SES Compras no está disponible.
+- Los errores de disponibilidad se distinguen del protocolo de reconciliación de comprobantes pendientes.
+
+### Arquitectura
+
+- Se separaron las responsabilidades de disponibilidad de la plataforma SES Compras y sus integraciones externas.
+- La implementación se realizó conforme al diseño definido en `07-Disponibilidad-de-Servicios.md`.
+
 ## Consolidación del Frontend v1
 
 ### Agregado

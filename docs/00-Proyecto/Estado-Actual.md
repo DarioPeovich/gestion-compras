@@ -22,7 +22,7 @@ Estado aproximado: **80 %**
 - Actualización de stock
 - Integración Node ↔ WinDev para comprobantes, implementada y validada
 - Protocolo idempotente de comprobantes finalizado
-- Verificación transversal de disponibilidad mediante `GET /api/status`
+- Subsistema de verificación de disponibilidad mediante `GET /api/status` y `GET /api/status/windev`
 
 ### Pendiente
 
@@ -32,7 +32,6 @@ Estado aproximado: **80 %**
 - Pagos
 - OCR
 - Libro IVA Compras
-- Etapa 2 de disponibilidad: `GET /api/status/windev`, condicionada a un endpoint específico en Gestión Ventas y destinada únicamente a procesos que dependan de WinDev
 
 ---
 
@@ -146,17 +145,18 @@ Se encuentran implementados:
 
 El protocolo transaccional y de reconciliación descrito corresponde a comprobantes. Remitos conserva su flujo específico y no debe considerarse implementado con exactamente el mismo mecanismo.
 
-### Disponibilidad de SES Compras
+### Disponibilidad de servicios
 
-La Etapa 1 de disponibilidad se encuentra implementada y forma parte de la arquitectura operativa. El endpoint transversal:
+El subsistema de verificación de disponibilidad se encuentra completamente implementado y forma parte de la arquitectura operativa mediante dos endpoints exclusivamente de consulta:
 
 ```text
 GET /api/status
+GET /api/status/windev
 ```
 
-verifica que SES Compras API esté disponible y comprueba la conectividad con PostgreSQL mediante Prisma. Su respuesta representa exclusivamente el estado de SES Compras: no verifica Gestión Ventas ni otras integraciones externas.
+`GET /api/status` verifica la disponibilidad de SES Compras API (Node) y la conectividad con PostgreSQL. `GET /api/status/windev` consulta Gestión Ventas API y permite diferenciar si el servicio responde y si HFSQL se encuentra disponible. Ninguno de estos endpoints ejecuta lógica de negocio.
 
-El frontend utiliza actualmente esta comprobación antes de iniciar Nuevo Comprobante:
+El frontend realiza esta verificación previa antes de iniciar procesos críticos. El flujo vigente de Nuevo Comprobante comienza así:
 
 ```text
 Usuario
@@ -167,9 +167,9 @@ Usuario
   -> apertura del formulario
 ```
 
-Si SES Compras no está disponible, el flujo se interrumpe antes de ejecutar procesos funcionales y el operador recibe un mensaje específico de disponibilidad. De esta forma, una caída de Node ya no se presenta como un problema de Gestión Ventas.
+Si SES Compras no está disponible, el flujo se interrumpe antes de ejecutar procesos funcionales y el operador recibe un mensaje específico de disponibilidad. De esta forma se distinguen SES Compras API, PostgreSQL, Gestión Ventas API y HFSQL, y una caída de Node ya no se presenta como un problema de Gestión Ventas.
 
-Permanece pendiente únicamente la segunda etapa de disponibilidad, `GET /api/status/windev`. Requerirá un endpoint específico en Gestión Ventas y se utilizará sólo en módulos o procesos que dependan realmente de WinDev.
+La reconciliación de operaciones pendientes continúa siendo un mecanismo independiente y no fue reemplazada por los endpoints de estado.
 
 ## Deuda técnica externa — WinDev
 

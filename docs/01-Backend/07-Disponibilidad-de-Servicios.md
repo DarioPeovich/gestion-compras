@@ -2,15 +2,21 @@
 
 # 07 - Disponibilidad de Servicios
 
-**Estado actual:** 🟢 Etapa 1 implementada y validada.\
-**Etapa siguiente:** 🟡 Etapa 2 pendiente.\
+**Estado actual:** 🟢 Etapas 1 y 2 implementadas y validadas.\
 **Versión:** 0.1\
 **Última actualización:** Julio 2026
 
 > Documento de arquitectura para la verificación transversal de disponibilidad
-> de SES Compras y sus integraciones. La Etapa 1 se encuentra implementada; las
-> rutas de etapas posteriores no se consideran disponibles hasta completar su
-> implementación y validación.
+> de SES Compras y sus integraciones. Se encuentran implementados y validados
+> tanto el estado general de SES Compras como la verificación específica de
+> Gestión Ventas.
+
+Endpoints de disponibilidad implementados:
+
+```http
+GET /api/status
+GET /api/status/windev
+```
 
 ---
 
@@ -172,7 +178,7 @@ GET /api/status/{servicio}
 `/api/status` representa exclusivamente la plataforma SES Compras. Cada
 dependencia externa se identifica mediante un segmento estable en
 `/api/status/{servicio}`, sin incorporarla al resultado general. Para Gestión
-Ventas, el diseño previsto utiliza:
+Ventas, se encuentra implementado:
 
 ```http
 GET /api/status/windev
@@ -182,7 +188,7 @@ Esta convención permite agregar futuras integraciones sin romper el contrato de
 estado general ni crear rutas con patrones diferentes para la misma
 responsabilidad.
 
-Se diseña como segunda etapa un endpoint separado:
+La segunda etapa implementa un endpoint separado:
 
 ```http
 GET /api/status/windev
@@ -190,39 +196,77 @@ GET /api/status/windev
 
 ## Responsabilidad
 
-Debe:
+El endpoint:
 
 - comprobar exclusivamente la disponibilidad de Gestión Ventas API;
 - ejecutarse a través de Node;
-- consultar un endpoint de estado propio de WinDev;
+- consulta `GET /apicompras/status` en Gestión Ventas;
+- normaliza la respuesta para su consumo desde el frontend;
 - no modificar datos;
 - no generar `operacionID`;
 - no ejecutar reconciliación;
 - no consultar una operación de negocio ficticia.
 
-Respuesta exitosa de referencia:
+No ejecuta ninguna operación de negocio: únicamente verifica disponibilidad y
+permite al frontend distinguir entre la indisponibilidad del servicio y una
+caída de HFSQL antes de iniciar procesos que dependen de Gestión Ventas.
+
+### Servicio operativo
+
+Cuando Gestión Ventas y HFSQL están disponibles, Node responde HTTP 200:
 
 ```json
 {
   "ok": true,
   "servicio": "Gestión Ventas API",
-  "estado": "ACTIVO"
+  "estado": "ACTIVO",
+  "database": {
+    "estado": "ACTIVA"
+  }
 }
 ```
 
-Respuesta no disponible de referencia:
+### Servicio disponible pero base HFSQL no disponible
+
+Cuando IIS/WebDev continúa funcionando pero no puede establecer la conexión con
+HFSQL, Node conserva la semántica confirmada por Gestión Ventas y responde HTTP
+503:
 
 ```json
 {
   "ok": false,
   "servicio": "Gestión Ventas API",
-  "estado": "NO_DISPONIBLE"
+  "estado": "NO_DISPONIBLE",
+  "database": {
+    "estado": "NO_DISPONIBLE"
+  }
 }
 ```
 
-El estado de WinDev es independiente del estado general de SES Compras. El
-endpoint interno de estado de WinDev es un requisito posterior y no se diseña en
-detalle en esta etapa.
+### Estado no verificable
+
+Cuando Node no puede obtener una respuesta válida y confiable de Gestión Ventas,
+responde HTTP 503:
+
+```json
+{
+  "ok": false,
+  "servicio": "Gestión Ventas API",
+  "estado": "NO_DISPONIBLE",
+  "database": {
+    "estado": "NO_VERIFICADA"
+  }
+}
+```
+
+`NO_VERIFICADA` corresponde únicamente a timeout, error de conexión, JSON
+inválido, respuesta incompleta o fallo de comunicación con Gestión Ventas.
+
+La consulta utiliza un timeout específico de 20 segundos porque WebDev/HFSQL
+puede tardar varios segundos en detectar la caída del servidor HFSQL. Este
+timeout no se aplica al resto de las integraciones funcionales.
+
+El estado de Gestión Ventas es independiente del estado general de SES Compras.
 
 ---
 
@@ -250,8 +294,7 @@ Ese `ok: false` sería ambiguo para un módulo que no utiliza WinDev. Por ejempl
 La decisión arquitectónica es:
 
 - `/api/status` verifica la plataforma SES Compras;
-- `/api/status/windev` verificará la integración con Gestión Ventas cuando se
-  implemente la Etapa 2;
+- `/api/status/windev` verifica la integración con Gestión Ventas;
 - cada módulo consulta únicamente las dependencias necesarias para su acción.
 
 ---
@@ -398,7 +441,6 @@ La primera implementación, mínima y transversal, se encuentra completada.
 
 No se incluyen todavía:
 
-- `/api/status/windev`;
 - panel visual permanente;
 - indicadores en el encabezado;
 - polling o cron;
@@ -406,9 +448,8 @@ No se incluyen todavía:
 - alertas automáticas;
 - reintentos en segundo plano.
 
-`/api/status/windev` queda diseñado en este documento, pero se implementará en
-una segunda etapa después de definir el endpoint de estado correspondiente en
-WinDev.
+La Etapa 2 incorpora `GET /api/status/windev` y la consulta al endpoint de estado
+correspondiente en Gestión Ventas.
 
 ---
 
@@ -464,22 +505,20 @@ verificaciones simples.
 - consumo reutilizable incorporado en frontend;
 - aplicación inicial incorporada al ingreso de Nuevo Comprobante.
 
-## Etapas futuras
+## Etapa 2 - Estado de Gestión Ventas - Implementada y validada
 
-Queda pendiente únicamente `GET /api/status/windev`. Su implementación:
-
-- requerirá un endpoint específico de estado en Gestión Ventas API;
-- informará exclusivamente la disponibilidad de Gestión Ventas;
-- se utilizará sólo en procesos que requieran esa integración;
-- no reemplazará la reconciliación ni las validaciones funcionales.
+- `/api/status/windev` implementado;
+- consulta de `GET /apicompras/status` implementada;
+- estados `ACTIVO`, `NO_DISPONIBLE` y `NO_VERIFICADA` diferenciados;
+- respuesta normalizada para el frontend;
+- timeout específico de 20 segundos aplicado únicamente a esta comprobación.
 
 ---
 
 # 13. Pruebas
 
-Los casos de la Etapa 1 fueron cubiertos mediante validación técnica, consulta
-real del endpoint y simulaciones controladas de indisponibilidad. El caso que
-depende de `/api/status/windev` permanece previsto para la Etapa 2.
+Los casos de las Etapas 1 y 2 fueron cubiertos mediante validación técnica,
+consulta real de los endpoints y simulaciones controladas de indisponibilidad.
 
 1. **Node y PostgreSQL activos:** `/api/status` devuelve estado activo.
 2. **Node detenido:** el frontend detecta el error de conexión, muestra
@@ -495,15 +534,17 @@ depende de `/api/status/windev` permanece previsto para la Etapa 2.
    requiere.
 7. **Restauración del servicio:** una nueva acción manual permite continuar y no
    existen reintentos automáticos.
+8. **Gestión Ventas y HFSQL activos:** `/api/status/windev` responde HTTP 200 con
+   `ACTIVO` y base `ACTIVA`.
+9. **Gestión Ventas activa y HFSQL no disponible:** `/api/status/windev` responde
+   HTTP 503 con base `NO_DISPONIBLE`.
+10. **Estado externo no verificable:** timeout, error de conexión o respuesta no
+    válida producen HTTP 503 con base `NO_VERIFICADA`.
 
 ---
 
 # 14. Pendientes de implementación
 
-Permanece pendiente únicamente:
-
-- implementar `GET /api/status/windev` en una etapa posterior, después de crear
-  el endpoint específico de estado en Gestión Ventas API.
-
-Esta verificación externa informará sólo la disponibilidad de Gestión Ventas y
-no sustituirá la reconciliación ni las validaciones funcionales.
+No quedan pendientes de implementación dentro de las Etapas 1 y 2 definidas en
+este documento. Las verificaciones de disponibilidad no sustituyen la
+reconciliación ni las validaciones funcionales.
