@@ -12,7 +12,7 @@ export default function SESItemsFactura({
   proveedorId, modoIngreso, handleCambiarModo, tiposIva, toNum, setItems,
   nextUid, calcularImportesLinea, setErrores, agregarConceptoManual, ErrMsg,
   items, mostrarICL, mostrarIDC, mostrarImpInt, updateItem, NumInput,
-  gridInputCls, fmt3,
+  gridInputCls, fmt3, handleActualizarCosto,
 }) {
   const columnasItems = [
     "14ch", "14ch", "16ch", "12ch", "14ch",
@@ -44,6 +44,7 @@ export default function SESItemsFactura({
             <BuscadorArticulos
               proveedorId={proveedorId}
               onSeleccionar={(articulo) => {
+                const esCombustible = articulo.es_combustible === true;
                 const base = {
                   hfsql_articulos_id: articulo.articulos_id,
                   descripcion: articulo.descripcion,
@@ -63,7 +64,7 @@ export default function SESItemsFactura({
                   precio_costo_original: articulo.precio_costo,
                   precio_costo:
                     articulo.precio_costo_proveedor || articulo.precio_costo || 0,
-                  actualizar_costo: true,
+                  actualizar_costo: false,
                   iva_tipo_id: String(
                     articulo.IvaTiposID ?? articulo.iva_tipos_id ??
                     tiposIva.find(
@@ -71,14 +72,34 @@ export default function SESItemsFactura({
                     )?.ivaTiposID ?? ""
                   ),
                   alicuota_iva: toNum(articulo.alicuota_iva),
-                  imp_interno_monto: toNum(articulo.imp_interno_monto),
-                  icl_unit: toNum(articulo.imp_transf_comb),
-                  idc_unit: toNum(articulo.imp_dioxido_carbono),
+                  es_combustible: esCombustible,
+                  imp_interno_monto: esCombustible
+                    ? 0
+                    : toNum(articulo.imp_interno_monto),
+                  icl_unit: esCombustible ? toNum(articulo.imp_transf_comb) : 0,
+                  idc_unit: esCombustible ? toNum(articulo.imp_dioxido_carbono) : 0,
                 };
-                setItems((prev) => [
-                  ...prev,
-                  { ...base, _uid: nextUid(), ...calcularImportesLinea(base) },
-                ]);
+                setItems((prev) => {
+                  const articuloId = Number(base.hfsql_articulos_id);
+                  const yaTieneLineaMarcada = prev.some(
+                    (item) =>
+                      Number(item.hfsql_articulos_id) === articuloId &&
+                      item.actualizar_costo === true
+                  );
+                  const nuevoItem = {
+                    ...base,
+                    actualizar_costo:
+                      toNum(base.precio_costo) > 0 && !yaTieneLineaMarcada,
+                  };
+                  return [
+                    ...prev,
+                    {
+                      ...nuevoItem,
+                      _uid: nextUid(),
+                      ...calcularImportesLinea(nuevoItem),
+                    },
+                  ];
+                });
                 setErrores((prev) => ({ ...prev, items: undefined }));
               }}
             />
@@ -94,6 +115,7 @@ export default function SESItemsFactura({
                 <div className="divide-y divide-gray-100">
                   {items.map((item, idx) => {
                     const esManual = Number(item.hfsql_articulos_id) === -99;
+                    const esCombustible = item.es_combustible === true;
                     const datosSecundarios = [
                       item.cod_barras ? `CB: ${item.cod_barras}` : null,
                       item.cod_proveedor ? `Cod. Prov: ${item.cod_proveedor}` : null,
@@ -162,30 +184,48 @@ export default function SESItemsFactura({
                           {mostrarICL && (
                             <div>
                               <div className="mb-1 text-xs text-gray-500 text-right">ICL (ITC)</div>
-                              {esManual ? <div className="py-1 text-sm text-center text-gray-300">—</div> :
-                                <NumInput value={item.icl_unit} onValueChange={(v) => updateItem(idx, "icl_unit", v.floatValue ?? 0)} className={gridInputCls()} />}
+                              <NumInput
+                                value={esCombustible ? item.icl_unit : 0}
+                                disabled={!esCombustible}
+                                onValueChange={(v) => updateItem(idx, "icl_unit", v.floatValue ?? 0)}
+                                className={gridInputCls()}
+                              />
                             </div>
                           )}
                           {mostrarIDC && (
                             <div>
                               <div className="mb-1 text-xs text-gray-500 text-right">IDC</div>
-                              {esManual ? <div className="py-1 text-sm text-center text-gray-300">—</div> :
-                                <NumInput value={item.idc_unit} onValueChange={(v) => updateItem(idx, "idc_unit", v.floatValue ?? 0)} className={gridInputCls()} />}
+                              <NumInput
+                                value={esCombustible ? item.idc_unit : 0}
+                                disabled={!esCombustible}
+                                onValueChange={(v) => updateItem(idx, "idc_unit", v.floatValue ?? 0)}
+                                className={gridInputCls()}
+                              />
                             </div>
                           )}
                           {mostrarImpInt && (
                             <div>
                               <div className="mb-1 text-xs text-gray-500 text-right">Imp.Int.</div>
-                              <div className="py-1 text-sm text-right text-gray-700">
-                                {esManual ? "—" : `$ ${fmt3(item.importe_imp_interno)}`}
-                              </div>
+                              {esCombustible ? (
+                                <div className="py-1 text-sm text-right text-gray-700">
+                                  $ {fmt3(toNum(item.icl_unit) + toNum(item.idc_unit))}
+                                </div>
+                              ) : (
+                                <NumInput
+                                  value={item.imp_interno_monto}
+                                  onValueChange={(v) =>
+                                    updateItem(idx, "imp_interno_monto", v.floatValue ?? 0)
+                                  }
+                                  className={gridInputCls()}
+                                />
+                              )}
                             </div>
                           )}
                           <div>
                             <div className="mb-1 text-xs text-gray-500 text-center">Act.Precio</div>
                             <div className="py-1 text-center">
                               {esManual ? <span className="text-gray-300">—</span> :
-                                <SESCheckbox checked={item.actualizar_costo} onChange={(e) => updateItem(idx, "actualizar_costo", e.target.checked)} />}
+                                <SESCheckbox checked={item.actualizar_costo} onChange={(e) => handleActualizarCosto(idx, e.target.checked)} />}
                             </div>
                           </div>
                           <div>

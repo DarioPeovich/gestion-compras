@@ -116,6 +116,25 @@ Sucursal, depósito y actualización obligatoria de stock no pertenecen a la gri
 
 Volver a una sola vista con condiciones por cada columna mezclaría nuevamente modelos funcionales diferentes. El selector común debe permanecer pequeño y las diferencias deben evolucionar dentro de cada vista especializada.
 
+### Artículos repetidos y actualización única del costo
+
+Un comprobante de compra puede contener varias líneas correspondientes al mismo artículo. Esta situación es válida y debe permitirse porque puede representar promociones, bonificaciones, unidades sin cargo, descuentos comerciales o distintas condiciones económicas informadas por el proveedor para un mismo artículo.
+
+Son casos válidos, entre otros:
+
+- 20 unidades a precio normal y 5 unidades bonificadas;
+- 10 unidades a precio normal y 10 unidades con descuento del 15 %;
+- 8 unidades a precio normal y 2 unidades a $0,01;
+- cualquier otra combinación de líneas informada por el proveedor.
+
+Todas las líneas repetidas participan normalmente en cantidades, stock, impuestos y total del comprobante. No se consolidan ni se sobrescriben automáticamente: cada una conserva su identidad y sus condiciones económicas dentro del detalle.
+
+La actualización del precio de costo es una decisión explícita y opcional del operador. Para cada artículo puede haber cero o una línea marcada con `Actualizar precio costo`; nunca pueden coexistir dos líneas marcadas para el mismo artículo. Al seleccionar otra línea válida del mismo artículo, el cambio se realiza de forma atómica y se desmarca la selección anterior.
+
+Una línea sólo puede actualizar el costo cuando su precio es mayor que cero. Si existen varias líneas positivas del mismo artículo con precios diferentes, la línea seleccionada debe tener un precio superior al 10 % del mayor precio positivo del grupo. Cuando todas las líneas positivas tienen el mismo precio, puede elegirse cualquiera de ellas, manteniendo siempre el límite de una sola selección. Los precios no positivos y los precios simbólicos que no superan ese umbral son rechazados mediante el mecanismo de mensajes vigente.
+
+Antes del envío al backend se ejecuta una validación final defensiva de estas reglas. La selección de `Actualizar precio costo` no modifica cantidades, stock, impuestos, subtotales ni total, y permanece independiente de la validación entre `Total Factura` y la suma calculada.
+
 ## 8. Modos de ingreso
 
 El estado inicial es `detallado`. Sólo las categorías configuradas para el flujo valorizado exponen el selector entre detallado y simplificado; Remitos y documentos sin ítems no comparten ambos modos.

@@ -52,6 +52,10 @@ Estado: **Consolidación del frontend v1 finalizada**
 - Notas de Débito
 - Remitos con flujo frontend específico y no valorizado
 - Buscador de artículos mediante Portal
+- Carga de múltiples líneas correspondientes al mismo artículo, sin consolidación automática y con participación normal en cantidades, stock, impuestos y total
+- Selección opcional de una única línea por artículo para `Actualizar precio costo`, con cambio atómico entre líneas repetidas
+- Protección contra la actualización de costo desde líneas con precio no positivo o con precios simbólicos que no superen el umbral funcional definido respecto del mayor precio positivo del artículo
+- Validación final defensiva de la selección de costo antes de enviar el comprobante al backend, independiente del cálculo y la validación de `Total Factura`
 - Control obligatorio de Total Factura para Facturas y Notas de Crédito
 - Comparación de `totalManual` contra `sumaCalculada` con tolerancia absoluta de 0,05
 - Cancelación inteligente basada en datos significativos ingresados
@@ -156,18 +160,27 @@ GET /api/status/windev
 
 `GET /api/status` verifica la disponibilidad de SES Compras API (Node) y la conectividad con PostgreSQL. `GET /api/status/windev` consulta Gestión Ventas API y permite diferenciar si el servicio responde y si HFSQL se encuentra disponible. Ninguno de estos endpoints ejecuta lógica de negocio.
 
-El frontend realiza esta verificación previa antes de iniciar procesos críticos. El flujo vigente de Nuevo Comprobante comienza así:
+El frontend ejecuta ambas verificaciones antes de iniciar la reconciliación. El flujo vigente de Nuevo Comprobante es:
 
 ```text
 Usuario
-  -> Nuevo Comprobante
-  -> GET /api/status
-  -> si SES Compras está disponible
-  -> reconciliación de pendientes
-  -> apertura del formulario
+    ↓
+Nuevo Comprobante
+    ↓
+GET /api/status
+    ↓
+GET /api/status/windev
+    ↓
+si ambos servicios están disponibles
+    ↓
+GET /api/comprobantes/reconciliar-pendientes
+    ↓
+apertura del formulario
 ```
 
-Si SES Compras no está disponible, el flujo se interrumpe antes de ejecutar procesos funcionales y el operador recibe un mensaje específico de disponibilidad. De esta forma se distinguen SES Compras API, PostgreSQL, Gestión Ventas API y HFSQL, y una caída de Node ya no se presenta como un problema de Gestión Ventas.
+`GET /api/status` verifica SES Compras API y PostgreSQL. `GET /api/status/windev` verifica Gestión Ventas API y HFSQL. La reconciliación sólo comienza cuando ambos servicios se encuentran disponibles.
+
+Si alguna dependencia no está disponible o su estado no puede verificarse, el flujo se interrumpe antes de ejecutar la reconciliación y el operador recibe un mensaje específico. De esta forma se distinguen SES Compras API, PostgreSQL, Gestión Ventas API y HFSQL, y una caída de Node ya no se presenta como un problema de Gestión Ventas.
 
 La reconciliación de operaciones pendientes continúa siendo un mecanismo independiente y no fue reemplazada por los endpoints de estado.
 

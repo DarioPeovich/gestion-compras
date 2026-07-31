@@ -219,7 +219,73 @@ export const registrarComprobante = async (req, res, next) => {
         error: 'deposito_id es obligatorio y debe ser un entero positivo cuando se actualiza stock',
       })
     }
-    const itemsReales = items.filter(i => Number(i.hfsql_articulos_id) !== -99)
+    const itemsNormalizados = []
+    for (const item of items) {
+      const esManual = Number(item.hfsql_articulos_id) === -99
+      if (!esManual && typeof item.es_combustible !== 'boolean') {
+        return res.status(400).json({
+          ok: false,
+          error: 'es_combustible debe ser booleano para todos los artículos vinculados',
+        })
+      }
+
+      const cantidad = Number(item.cantidad)
+      const esCombustible = item.es_combustible === true
+      const iclInformado = Number(item.icl_unit || 0)
+      const idcInformado = Number(item.idc_unit || 0)
+      const impInternoInformado = Number(item.imp_interno_monto || 0)
+      if (
+        !Number.isFinite(iclInformado) || iclInformado < 0 ||
+        !Number.isFinite(idcInformado) || idcInformado < 0 ||
+        !Number.isFinite(impInternoInformado) || impInternoInformado < 0
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error: 'ICL, IDC e Impuesto Interno deben ser valores numéricos no negativos',
+        })
+      }
+      if (!esCombustible && (iclInformado !== 0 || idcInformado !== 0)) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Un artículo no combustible no puede informar ICL ni IDC',
+        })
+      }
+
+      const iclUnit = esCombustible ? iclInformado : 0
+      const idcUnit = esCombustible ? idcInformado : 0
+      const impInternoUnit = esCombustible ? 0 : impInternoInformado
+      const importeIcl = Math.round(iclUnit * cantidad * 1000) / 1000
+      const importeIdc = Math.round(idcUnit * cantidad * 1000) / 1000
+      const importeImpInterno = Math.round(
+        (esCombustible ? iclUnit + idcUnit : impInternoUnit) * cantidad * 1000
+      ) / 1000
+      const importesCoherentes = [
+        ['importe_icl', importeIcl],
+        ['importe_idc', importeIdc],
+        ['importe_imp_interno', importeImpInterno],
+      ].every(([campo, esperado]) =>
+        Math.abs(Number(item[campo] || 0) - esperado) <= 0.001
+      )
+      if (!importesCoherentes) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Los importes de ICL, IDC o Impuesto Interno son inconsistentes',
+        })
+      }
+
+      itemsNormalizados.push({
+        ...item,
+        es_combustible: esCombustible,
+        icl_unit: iclUnit,
+        idc_unit: idcUnit,
+        imp_interno_monto: impInternoUnit,
+        importe_icl: importeIcl,
+        importe_idc: importeIdc,
+        importe_imp_interno: importeImpInterno,
+      })
+    }
+
+    const itemsReales = itemsNormalizados.filter(i => Number(i.hfsql_articulos_id) !== -99)
     const hayIntegracionWinDev = itemsReales.length > 0 && (
       actualizarStock || itemsReales.some(i => i.actualizar_costo === true)
     )
@@ -254,8 +320,8 @@ export const registrarComprobante = async (req, res, next) => {
     }
 
     // ── Subtotal desde líneas o desde body ───────────────────────────────
-    const subtotalCalc = items.length > 0
-      ? items.reduce((s, i) => s + Number(i.importe_linea || 0), 0)
+    const subtotalCalc = itemsNormalizados.length > 0
+      ? itemsNormalizados.reduce((s, i) => s + Number(i.importe_linea || 0), 0)
       : Number(subtotal) || 0
 
     // ── IVA agrupado: desde iva_detalle_manual (simplificado/ajuste) o desde items
@@ -272,7 +338,7 @@ export const registrarComprobante = async (req, res, next) => {
     } else {
       // Calcular desde items (modo detallado)
       const map = {}
-      for (const i of items) {
+      for (const i of itemsNormalizados) {
         const alicuota  = Number(i.alicuota_iva  || 0)
         const ivaTipoId = Number(i.iva_tipo_id   || TRIBUTO_IVA)
         const iva       = Number(i.importe_iva   || 0)
@@ -288,15 +354,22 @@ export const registrarComprobante = async (req, res, next) => {
 
     // ── Totales de tributos: desde pie_otros (simplificado) o desde items (detallado)
     const totalIVA    = ivaFilasParaGrabar.reduce((s, f) => s + f.importe_iva, 0)
-    const totalICL    = pie_otros ? Number(pie_otros.icl         || 0) : items.reduce((s, i) => s + Number(i.importe_icl         || 0), 0)
-    const totalIDC    = pie_otros ? Number(pie_otros.idc         || 0) : items.reduce((s, i) => s + Number(i.importe_idc         || 0), 0)
-    const totalImpInt = pie_otros ? Number(pie_otros.imp_interno || 0) : items.reduce((s, i) => s + Number(i.importe_imp_interno || 0), 0)
+    const esIngresoDetallado = modo_ingreso === 'detallado'
+    const totalICL = esIngresoDetallado
+      ? itemsNormalizados.reduce((s, i) => s + Number(i.importe_icl || 0), 0)
+      : Number(pie_otros?.icl || 0)
+    const totalIDC = esIngresoDetallado
+      ? itemsNormalizados.reduce((s, i) => s + Number(i.importe_idc || 0), 0)
+      : Number(pie_otros?.idc || 0)
+    const totalImpInt = esIngresoDetallado
+      ? itemsNormalizados.reduce((s, i) => s + Number(i.importe_imp_interno || 0), 0)
+      : Number(pie_otros?.imp_interno || 0)
 
     // Percepciones manuales
     const totalPercepciones = percepciones.reduce((s, p) => s + Number(p.importe || 0), 0)
 
     const totalCalc = Number(total) ||
-      subtotalCalc + totalIVA + totalICL + totalIDC + totalImpInt + totalPercepciones
+      subtotalCalc + totalIVA + totalImpInt + totalPercepciones
 
     // ── Transacción principal ─────────────────────────────────────────────
     const resultado = await prisma.$transaction(async (tx) => {
@@ -323,9 +396,9 @@ export const registrarComprobante = async (req, res, next) => {
       })
 
       // 2. Detalle de líneas
-      if (items.length > 0) {
+      if (itemsNormalizados.length > 0) {
         await tx.compras_comprobantes_detalle.createMany({
-          data: items.map(i => ({
+          data: itemsNormalizados.map(i => ({
             comprobante_id:      comprobante.id,
             hfsql_articulos_id:  Number(i.hfsql_articulos_id),
             articulo_codigo:     i.articulo_codigo || null,
@@ -431,9 +504,12 @@ export const registrarComprobante = async (req, res, next) => {
           actualizarStock,
           items: itemsReales.map(i => {
             const cantidad = Number(i.cantidad) || 1
-            const iclUnit = Number(i.importe_icl || 0) / cantidad
-            const idcUnit = Number(i.importe_idc || 0) / cantidad
-            const esCombustible = iclUnit > 0 || idcUnit > 0
+            const esCombustible = i.es_combustible === true
+            const iclUnit = esCombustible ? Number(i.icl_unit || 0) : 0
+            const idcUnit = esCombustible ? Number(i.idc_unit || 0) : 0
+            const impInternoUnit = esCombustible
+              ? iclUnit + idcUnit
+              : Number(i.imp_interno_monto || 0)
 
             return {
               articulosID: Number(i.hfsql_articulos_id),
@@ -444,9 +520,7 @@ export const registrarComprobante = async (req, res, next) => {
               proveedoresID: Number(proveedorHfsqlId),
               impTransfComb: iclUnit,
               impDioxidoCarbono: idcUnit,
-              impInternoMonto: esCombustible
-                ? iclUnit + idcUnit
-                : Number(i.importe_imp_interno || 0) / cantidad,
+              impInternoMonto: impInternoUnit,
               ivaTiposID: Number(i.iva_tipo_id) || 0,
             }
           }),

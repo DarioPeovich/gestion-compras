@@ -182,16 +182,53 @@ const calcularImportesLinea = (item) => {
   const neto = Math.round(cant * costo * 1000) / 1000;
   const icl_unit = toNum(item.icl_unit);
   const idc_unit = toNum(item.idc_unit);
-  const esComb = icl_unit > 0 || idc_unit > 0;
+  const imp_interno_unit = toNum(item.imp_interno_monto);
+  const esCombustible = item.es_combustible === true;
   return {
     importe_linea: neto,
     importe_iva: Math.round(((neto * toNum(item.alicuota_iva)) / 100) * 1000) / 1000,
-    importe_icl: Math.round(icl_unit * cant * 1000) / 1000,
-    importe_idc: Math.round(idc_unit * cant * 1000) / 1000,
-    importe_imp_interno: esComb
+    importe_icl: esCombustible ? Math.round(icl_unit * cant * 1000) / 1000 : 0,
+    importe_idc: esCombustible ? Math.round(idc_unit * cant * 1000) / 1000 : 0,
+    importe_imp_interno: esCombustible
       ? Math.round((icl_unit + idc_unit) * cant * 1000) / 1000
-      : Math.round(toNum(item.imp_interno_monto) * cant * 1000) / 1000,
+      : Math.round(imp_interno_unit * cant * 1000) / 1000,
   };
+};
+
+const evaluarActualizacionCosto = (items, indiceSeleccionado) => {
+  const linea = items[indiceSeleccionado];
+  const articuloId = Number(linea?.hfsql_articulos_id);
+  const precioSeleccionado = toNum(linea?.precio_costo);
+
+  if (!linea || articuloId === -99) {
+    return { elegible: false, motivo: "La línea seleccionada no corresponde a un artículo." };
+  }
+
+  if (precioSeleccionado <= 0) {
+    return {
+      elegible: false,
+      motivo: "No se puede actualizar el costo desde una línea con precio igual o menor que cero.",
+    };
+  }
+
+  const preciosPositivos = items
+    .filter((item) => Number(item.hfsql_articulos_id) === articuloId)
+    .map((item) => toNum(item.precio_costo))
+    .filter((precio) => precio > 0);
+  const mayorPrecioPositivo = Math.max(...preciosPositivos);
+  const todosIguales = preciosPositivos.every(
+    (precio) => precio === preciosPositivos[0]
+  );
+
+  if (!todosIguales && !(precioSeleccionado > mayorPrecioPositivo * 0.1)) {
+    return {
+      elegible: false,
+      motivo:
+        "El precio seleccionado no supera el 10 % del mayor precio informado para este artículo.",
+    };
+  }
+
+  return { elegible: true, motivo: null };
 };
 
 // ─── IVA agrupado desde items ─────────────────────────────────────────────────
@@ -226,7 +263,9 @@ let uidCounter = 0;
 const nextUid = () => `row-${++uidCounter}-${Date.now()}`;
 
 // ─── Componente NumericFormat para inputs de grilla/pie ──────────────────────
-const NumInput = ({ value, onValueChange, className, placeholder = "0,000" }) => (
+const NumInput = ({
+  value, onValueChange, className, placeholder = "0,000", disabled = false,
+}) => (
   <NumericFormat
     value={value}
     thousandSeparator="."
@@ -236,6 +275,7 @@ const NumInput = ({ value, onValueChange, className, placeholder = "0,000" }) =>
     onValueChange={onValueChange}
     placeholder={placeholder}
     className={className}
+    disabled={disabled}
   />
 );
 
@@ -292,12 +332,6 @@ export default function NuevoComprobante({ onCancelar }) {
   const [cargando, setCargando] = useState(false);
 
   // ── Columnas sticky ──────────────────────────────────────────────────────────
-  const [colsVisibles, setColsVisibles] = useState({
-    icl: false,
-    idc: false,
-    impInt: false,
-  });
-
   // ── Derivados ────────────────────────────────────────────────────────────────
   const configCategoria =
     CONFIG_CATEGORIAS[categoria] ?? CONFIG_CATEGORIA_INICIAL;
@@ -347,42 +381,28 @@ export default function NuevoComprobante({ onCancelar }) {
     }
   }, [tiposFiltrados, tipoId]);
 
-  const tieneICL = items.some((i) => toNum(i.icl_unit) > 0);
-  const tieneIDC = items.some((i) => toNum(i.idc_unit) > 0);
-  const tieneImpInt = items.some((i) => toNum(i.importe_imp_interno) > 0);
-
-  useEffect(() => {
-    setColsVisibles((prev) => ({
-      icl: prev.icl || tieneICL,
-      idc: prev.idc || tieneIDC,
-      impInt: prev.impInt || tieneImpInt,
-    }));
-  }, [tieneICL, tieneIDC, tieneImpInt]);
-
-  useEffect(() => {
-    if (items.length === 0) setColsVisibles({ icl: false, idc: false, impInt: false });
-  }, [items.length]);
-
-  const mostrarICL = colsVisibles.icl;
-  const mostrarIDC = colsVisibles.idc;
-  const mostrarImpInt = colsVisibles.impInt;
+  const hayCombustibles = items.some((item) => item.es_combustible === true);
+  const mostrarICL = hayCombustibles;
+  const mostrarIDC = hayCombustibles;
+  const mostrarImpInt = items.length > 0;
   const hayItemsReales = items.some((i) => Number(i.hfsql_articulos_id) !== -99);
 
   // ── Totales desde items ───────────────────────────────────────────────────────
   const subtotalNeto = items.reduce((s, i) => s + toNum(i.importe_linea), 0);
   const totalICL_det = items.reduce((s, i) => s + toNum(i.importe_icl), 0);
   const totalIDC_det = items.reduce((s, i) => s + toNum(i.importe_idc), 0);
-  const totalImpInt_det = items.reduce((s, i) => s + toNum(i.importe_imp_interno), 0);
+  const totalImpInt_det = items.reduce(
+    (s, i) => s + toNum(i.importe_imp_interno),
+    0
+  );
 
   // ── ICL/IDC/ImpInterno del pie: derivados en detallado, editables en simplificado
   const pieICL = usaIngresoDetallado ? totalICL_det : toNum(pieOtros.icl);
   const pieIDC = usaIngresoDetallado ? totalIDC_det : toNum(pieOtros.idc);
-  const pieImpInternoCalculado = pieICL + pieIDC > 0;
+  const pieImpInternoCalculado = !usaIngresoDetallado && pieICL + pieIDC > 0;
   const pieImpInterno =
     usaIngresoDetallado
-      ? pieImpInternoCalculado
-        ? pieICL + pieIDC
-        : totalImpInt_det
+      ? totalImpInt_det
       : pieImpInternoCalculado
         ? pieICL + pieIDC
         : toNum(pieOtros.imp_interno);
@@ -393,12 +413,10 @@ export default function NuevoComprobante({ onCancelar }) {
   const totalIvaItems = items.reduce((s, i) => s + toNum(i.importe_iva), 0);
   const baseEfectiva = usaIngresoDetallado ? subtotalNeto : totalBaseFilas;
   const ivaEfectivo = usaIngresoDetallado ? totalIvaItems : totalIvaFilas;
-  const totalICLIDC = pieICL + pieIDC;
   const sumaCalculada =
     baseEfectiva +
     ivaEfectivo +
-    totalICLIDC +
-    (pieImpInternoCalculado ? 0 : pieImpInterno) +
+    pieImpInterno +
     toNum(pieOtros.iibb) +
     toNum(pieOtros.munic);
 
@@ -508,11 +526,19 @@ export default function NuevoComprobante({ onCancelar }) {
     setItems((prev) =>
       prev.map((it, i) => {
         if (i !== idx) return it;
+        if (
+          (campo === "icl_unit" || campo === "idc_unit") &&
+          it.es_combustible !== true
+        ) {
+          const protegido = { ...it, icl_unit: 0, idc_unit: 0 };
+          return { ...protegido, ...calcularImportesLinea(protegido) };
+        }
         const updated = { ...it, [campo]: valor };
         if (
-          ["cantidad", "precio_costo", "icl_unit", "idc_unit", "iva_tipo_id"].includes(
-            campo
-          )
+          [
+            "cantidad", "precio_costo", "icl_unit", "idc_unit",
+            "imp_interno_monto", "iva_tipo_id",
+          ].includes(campo)
         ) {
           if (campo === "iva_tipo_id") {
             const tipo = tiposIva.find((t) => String(t.ivaTiposID) === String(valor));
@@ -521,6 +547,31 @@ export default function NuevoComprobante({ onCancelar }) {
           return { ...updated, ...calcularImportesLinea(updated) };
         }
         return updated;
+      })
+    );
+  };
+
+  const handleActualizarCosto = (idx, checked) => {
+    if (!checked) {
+      setItems((prev) =>
+        prev.map((item, itemIndex) =>
+          itemIndex === idx ? { ...item, actualizar_costo: false } : item
+        )
+      );
+      return;
+    }
+
+    const evaluacion = evaluarActualizacionCosto(items, idx);
+    if (!evaluacion.elegible) {
+      showToast({ type: "error", message: evaluacion.motivo });
+      return;
+    }
+
+    const articuloId = Number(items[idx].hfsql_articulos_id);
+    setItems((prev) =>
+      prev.map((item, itemIndex) => {
+        if (Number(item.hfsql_articulos_id) !== articuloId) return item;
+        return { ...item, actualizar_costo: itemIndex === idx };
       })
     );
   };
@@ -545,6 +596,7 @@ export default function NuevoComprobante({ onCancelar }) {
       actualizar_costo: false,
       iva_tipo_id: String(td.ivaTiposID),
       alicuota_iva: toNum(td.alicuota),
+      es_combustible: false,
       imp_interno_monto: 0,
       icl_unit: 0,
       idc_unit: 0,
@@ -675,10 +727,74 @@ export default function NuevoComprobante({ onCancelar }) {
     }
   };
 
+  const validarImpuestosItems = (errs) => {
+    if (!llevaItems || modoIngreso !== "detallado") return;
+
+    for (const item of items) {
+      const esArticulo = Number(item.hfsql_articulos_id) !== -99;
+      if (esArticulo && typeof item.es_combustible !== "boolean") {
+        if (!errs.items) errs.items = "No se pudo determinar si un artículo es combustible.";
+        return;
+      }
+
+      const iclUnit = toNum(item.icl_unit);
+      const idcUnit = toNum(item.idc_unit);
+      const impInternoUnit = toNum(item.imp_interno_monto);
+      if (iclUnit < 0 || idcUnit < 0 || impInternoUnit < 0) {
+        if (!errs.items) errs.items = "ICL, IDC e Impuesto Interno no pueden ser negativos.";
+        return;
+      }
+      if (item.es_combustible !== true && (iclUnit !== 0 || idcUnit !== 0)) {
+        if (!errs.items) errs.items = "Un artículo no combustible no puede informar ICL ni IDC.";
+        return;
+      }
+
+      const calculados = calcularImportesLinea(item);
+      const campos = ["importe_icl", "importe_idc", "importe_imp_interno"];
+      if (campos.some((campo) => Math.abs(toNum(item[campo]) - calculados[campo]) > 0.001)) {
+        if (!errs.items) errs.items = "Los impuestos calculados de un artículo son inconsistentes.";
+        return;
+      }
+    }
+  };
+
   const validarStockOpcional = (errs) => {
     if (actualizarStock && hayItemsReales) {
       if (!sucursalId) errs.sucursalId = "Seleccioná la sucursal";
       if (!depositoId) errs.depositoId = "Seleccioná el depósito";
+    }
+  };
+
+  const validarActualizacionCosto = (errs) => {
+    const indicesPorArticulo = new Map();
+
+    items.forEach((item, index) => {
+      const articuloId = Number(item.hfsql_articulos_id);
+      if (articuloId === -99) return;
+      if (!indicesPorArticulo.has(articuloId)) indicesPorArticulo.set(articuloId, []);
+      indicesPorArticulo.get(articuloId).push(index);
+    });
+
+    for (const indices of indicesPorArticulo.values()) {
+      const indicesMarcados = indices.filter(
+        (index) => items[index].actualizar_costo === true
+      );
+
+      if (indicesMarcados.length > 1) {
+        if (!errs.items) {
+          errs.items =
+            "Un artículo tiene más de una línea marcada para actualizar el precio costo.";
+        }
+        return;
+      }
+
+      if (indicesMarcados.length === 1) {
+        const evaluacion = evaluarActualizacionCosto(items, indicesMarcados[0]);
+        if (!evaluacion.elegible) {
+          if (!errs.items) errs.items = evaluacion.motivo;
+          return;
+        }
+      }
     }
   };
 
@@ -764,6 +880,10 @@ export default function NuevoComprobante({ onCancelar }) {
     validarDocumentoConItems(errs);
 
     validarDocumentoSinItems(errs);
+
+    validarImpuestosItems(errs);
+
+    validarActualizacionCosto(errs);
 
     validarStockOpcional(errs);
 
@@ -857,6 +977,10 @@ export default function NuevoComprobante({ onCancelar }) {
           importe_icl: toNum(i.importe_icl),
           importe_idc: toNum(i.importe_idc),
           importe_imp_interno: toNum(i.importe_imp_interno),
+          es_combustible: i.es_combustible === true,
+          icl_unit: toNum(i.icl_unit),
+          idc_unit: toNum(i.idc_unit),
+          imp_interno_monto: toNum(i.imp_interno_monto),
           actualizar_costo: i.actualizar_costo,
         }));
         percepcionesBody = [
@@ -1025,6 +1149,7 @@ export default function NuevoComprobante({ onCancelar }) {
           mostrarIDC={mostrarIDC}
           mostrarImpInt={mostrarImpInt}
           updateItem={updateItem}
+          handleActualizarCosto={handleActualizarCosto}
           NumInput={NumInput}
           gridInputCls={gridInputCls}
           fmt3={fmt3}

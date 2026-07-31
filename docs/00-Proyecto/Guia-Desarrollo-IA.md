@@ -107,6 +107,19 @@ Una preferencia estilística no es motivo suficiente para alterar una arquitectu
 
 En toda integración distribuida, un `ERROR` confirmado por el sistema remoto debe tratarse como un resultado definitivo. Si la operación todavía forma parte de la transacción local, debe preferirse el rollback de esa transacción antes que una compensación posterior. La idempotencia no reemplaza validaciones ni reglas de negocio: su único objetivo es resolver la incertidumbre producida por fallas de comunicación que impiden conocer el resultado real de una operación.
 
+### Política de verificación de disponibilidad
+
+Todo flujo que dependa de servicios externos debe verificar previamente la disponibilidad de las dependencias requeridas. Debe reutilizar el mecanismo estándar del proyecto:
+
+```text
+GET /api/status
+GET /api/status/{servicio}
+```
+
+La verificación previa evita iniciar operaciones cuando una dependencia necesaria no está disponible. No reemplaza las validaciones funcionales, la reconciliación, el manejo de errores ni los controles posteriores del proceso, porque una respuesta exitosa de estado no garantiza la disponibilidad futura del servicio.
+
+Los módulos nuevos deben reutilizar este mecanismo transversal y no implementar verificaciones particulares, duplicadas o basadas en operaciones de negocio ficticias.
+
 ### Evaluación previa a una refactorización
 
 Antes de proponer una refactorización, el asistente debe evaluar si el objetivo puede alcanzarse mediante una modificación incremental.
@@ -230,6 +243,22 @@ Un prompt de implementación debe incluir, como mínimo:
 - **política de commit:** indicar expresamente si se autoriza o prohíbe realizarlo.
 
 Los prompts deben distinguir diagnóstico, implementación, validación y documentación. Una tarea de diagnóstico no implica permiso para editar. Una tarea de implementación no implica permiso para hacer commit, cambiar contratos o documentar áreas no mencionadas.
+
+Cuando una tarea incluya implementación y documentación, ambas deben ejecutarse como etapas independientes y respetar este orden general:
+
+```text
+Diseño
+    ↓
+Implementación
+    ↓
+Validación
+    ↓
+Documentación
+    ↓
+Commit
+```
+
+La documentación sólo debe actualizarse después de validar la implementación correspondiente. Dentro de la etapa documental debe conservarse el orden de actualización definido por la política documental vigente. El commit constituye una etapa posterior y sólo puede realizarse cuando el prompt lo autorice expresamente.
 
 Cuando un prompt tenga alcance documental, debe indicar explícitamente:
 

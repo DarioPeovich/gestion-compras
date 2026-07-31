@@ -47,14 +47,29 @@ La Etapa 2, `GET /api/status/windev`, permanece pendiente, requerirá un endpoin
 
 ### Frontend
 
-- Se incorporó la verificación previa de disponibilidad antes de iniciar Nuevo Comprobante.
+- Se completó la integración frontend de disponibilidad antes de iniciar Nuevo Comprobante mediante la consulta secuencial de `GET /api/status` y `GET /api/status/windev`.
+- La reconciliación de comprobantes pendientes sólo se inicia cuando SES Compras, PostgreSQL, Gestión Ventas y HFSQL se encuentran disponibles.
+- El flujo se interrumpe antes de la reconciliación cuando una dependencia no está disponible o su estado no puede verificarse.
 - Se presentan mensajes específicos cuando SES Compras no está disponible.
+- Se incorporaron mensajes específicos para HFSQL `NO_DISPONIBLE` y para Gestión Ventas `NO_VERIFICADA`.
 - Los errores de disponibilidad se distinguen del protocolo de reconciliación de comprobantes pendientes.
 
 ### Arquitectura
 
 - Se separaron las responsabilidades de disponibilidad de la plataforma SES Compras y sus integraciones externas.
 - La implementación se realizó conforme al diseño definido en `07-Disponibilidad-de-Servicios.md`.
+
+## Artículos repetidos y actualización única del costo
+
+### Frontend
+
+- Se habilitó la carga de múltiples líneas correspondientes al mismo artículo sin consolidarlas automáticamente.
+- Todas las líneas repetidas participan normalmente en cantidades, stock, impuestos y total del comprobante.
+- La actualización del precio de costo quedó como una decisión opcional del operador, limitada a cero o una línea por artículo.
+- La selección entre líneas repetidas se realiza de forma atómica: al marcar una línea válida se desmarca la anterior del mismo artículo.
+- Se incorporó protección contra precios no positivos y precios simbólicos que no superen el umbral funcional respecto del mayor precio positivo del artículo.
+- Se agregó una validación final defensiva antes del envío al backend para impedir selecciones de costo inválidas.
+- La selección de `Actualizar precio costo` permanece independiente del cálculo del comprobante y de la validación entre `Total Factura` y el total calculado.
 
 ## Consolidación del Frontend v1
 
