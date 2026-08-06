@@ -71,6 +71,15 @@ La Etapa 2, `GET /api/status/windev`, permanece pendiente, requerirá un endpoin
 - Se agregó una validación final defensiva antes del envío al backend para impedir selecciones de costo inválidas.
 - La selección de `Actualizar precio costo` permanece independiente del cálculo del comprobante y de la validación entre `Total Factura` y el total calculado.
 
+### Impuestos Internos por artículo
+
+- Se incorporó el campo `es_combustible` al contrato de artículos.
+- Se implementó el tratamiento tributario diferenciado para artículos combustibles y no combustibles.
+- En combustibles el Impuesto Interno se calcula como `ICL + IDC`.
+- En no combustibles el Impuesto Interno se ingresa directamente.
+- Se corrigió el cálculo de comprobantes mixtos.
+- Frontend y backend utilizan `es_combustible` como fuente oficial de clasificación.
+
 ## Consolidación del Frontend v1
 
 ### Agregado

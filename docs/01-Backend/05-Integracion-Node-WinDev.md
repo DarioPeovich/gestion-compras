@@ -94,6 +94,30 @@ Actualmente los procesos principales son:
 - Sincronización de proveedores.
 - Consulta de operaciones.
 
+## Clasificación de artículos combustibles
+
+Todos los endpoints de consulta de artículos devuelven los siguientes campos:
+
+- `rubro_id`
+- `sub_rubro_id`
+- `es_combustible`
+
+Ejemplo:
+
+```json
+{
+  "rubro_id": 2,
+  "sub_rubro_id": 39,
+  "es_combustible": false
+}
+```
+
+`es_combustible` es la fuente oficial para determinar el tratamiento tributario del artículo.
+
+Frontend y backend deben utilizar este campo para decidir el comportamiento de ICL, IDC e Impuesto Interno.
+
+No debe inferirse la clasificación a partir de los importes de ICL o IDC.
+
 ---
 
 # 6. Protocolo de idempotencia

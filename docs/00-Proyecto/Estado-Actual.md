@@ -60,6 +60,14 @@ Estado: **Consolidación del frontend v1 finalizada**
 - Comparación de `totalManual` contra `sumaCalculada` con tolerancia absoluta de 0,05
 - Cancelación inteligente basada en datos significativos ingresados
 
+### Impuestos Internos
+
+✅ Implementado
+
+El sistema soporta artículos combustibles y no combustibles mediante
+`es_combustible`, con cálculo correcto de ICL, IDC e Impuesto Interno
+en frontend y backend.
+
 ### Arquitectura de NuevoComprobante
 
 `NuevoComprobante` conserva el estado, los cálculos, las validaciones y el submit, y coordina:
