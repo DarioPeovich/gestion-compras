@@ -52,6 +52,7 @@ Estado: **Consolidación del frontend v1 finalizada**
 - Notas de Débito
 - Remitos con flujo frontend específico y no valorizado
 - Buscador de artículos mediante Portal
+- Búsqueda por Código SES implementada de extremo a extremo mediante WinDev, Node y frontend
 - Carga de múltiples líneas correspondientes al mismo artículo, sin consolidación automática y con participación normal en cantidades, stock, impuestos y total
 - Selección opcional de una única línea por artículo para `Actualizar precio costo`, con cambio atómico entre líneas repetidas
 - Protección contra la actualización de costo desde líneas con precio no positivo o con precios simbólicos que no superen el umbral funcional definido respecto del mayor precio positivo del artículo
@@ -60,13 +61,44 @@ Estado: **Consolidación del frontend v1 finalizada**
 - Comparación de `totalManual` contra `sumaCalculada` con tolerancia absoluta de 0,05
 - Cancelación inteligente basada en datos significativos ingresados
 
+### Artículos repetidos
+
+Estado: ✅ Implementado y validado
+
+- Se permite ingresar múltiples líneas del mismo artículo sin consolidarlas.
+- Todas las líneas participan en cantidades, stock, impuestos y total del comprobante.
+- Por cada artículo puede haber cero o una línea marcada para actualizar el precio de costo.
+- Si se elimina la línea marcada, puede seleccionarse otra línea sin restricciones derivadas de la selección anterior.
+- El precio de costo se obtiene únicamente de la línea marcada.
+
 ### Impuestos Internos
 
-✅ Implementado
+Estado: ✅ Implementado y validado
 
-El sistema soporta artículos combustibles y no combustibles mediante
-`es_combustible`, con cálculo correcto de ICL, IDC e Impuesto Interno
-en frontend y backend.
+El contrato de artículos incorpora `es_combustible` como única fuente válida para determinar el tratamiento tributario. La clasificación no se infiere mediante los importes de ICL o IDC.
+
+- En artículos combustibles, ICL e IDC son editables, el Impuesto Interno se calcula como `ICL + IDC` y permanece en modo de sólo lectura.
+- En artículos no combustibles, ICL e IDC permanecen en cero y el Impuesto Interno es editable.
+- El total del comprobante incorpora únicamente el Impuesto Interno.
+- ICL e IDC constituyen exclusivamente la apertura informativa exigida por ARCA y no se adicionan nuevamente al total.
+- La misma regla se aplica en React y Node.
+
+### Validación funcional del bloque
+
+Se validaron satisfactoriamente:
+
+- Factura A simple;
+- Factura A con múltiples artículos;
+- artículos repetidos;
+- combustibles;
+- no combustibles;
+- comprobantes mixtos;
+- actualización de stock;
+- actualización de precio de costo;
+- persistencia PostgreSQL;
+- persistencia WinDev;
+- `apiOperacionesProcesadas`;
+- idempotencia.
 
 ### Arquitectura de NuevoComprobante
 
@@ -121,7 +153,6 @@ Para Facturas y Notas de Crédito, Total Factura es obligatorio, debe ser positi
 
 ### Pendiente
 
-- Búsqueda de artículos por Código SES y endpoint WinDev correspondiente.
 - Mensaje visual de error en búsquedas de artículos.
 - Presentación de alícuota IVA 10,50 %.
 - Validación funcional de motivo obligatorio y numeración interna automática para NC/ND internas.
@@ -191,9 +222,3 @@ apertura del formulario
 Si alguna dependencia no está disponible o su estado no puede verificarse, el flujo se interrumpe antes de ejecutar la reconciliación y el operador recibe un mensaje específico. De esta forma se distinguen SES Compras API, PostgreSQL, Gestión Ventas API y HFSQL, y una caída de Node ya no se presenta como un problema de Gestión Ventas.
 
 La reconciliación de operaciones pendientes continúa siendo un mecanismo independiente y no fue reemplazada por los endpoints de estado.
-
-## Deuda técnica externa — WinDev
-
-El mantenimiento de artículos en WinDev debe validar que, cuando ICL o IDC poseen valores, `ICL + IDC = Impuesto Interno`. Si ambos están vacíos o en cero, Impuesto Interno puede conservar un valor independiente.
-
-Esta clasificación pertenece a WinDev: SES Compras no debe determinar si un artículo es combustible. SES utiliza `ICL + IDC` cuando su suma es mayor que cero y `imp_interno_monto` en caso contrario.

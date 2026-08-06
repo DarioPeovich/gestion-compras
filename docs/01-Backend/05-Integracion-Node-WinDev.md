@@ -102,6 +102,8 @@ Todos los endpoints de consulta de artículos devuelven los siguientes campos:
 - `sub_rubro_id`
 - `es_combustible`
 
+Los endpoints construyen su respuesta mediante la estructura común `stArticulo`, que mantiene un contrato JSON unificado para las distintas modalidades de consulta.
+
 Ejemplo:
 
 ```json
@@ -117,6 +119,8 @@ Ejemplo:
 Frontend y backend deben utilizar este campo para decidir el comportamiento de ICL, IDC e Impuesto Interno.
 
 No debe inferirse la clasificación a partir de los importes de ICL o IDC.
+
+Para artículos combustibles, ICL e IDC conforman el Impuesto Interno y se conservan como su apertura informativa. Para artículos no combustibles, ICL e IDC permanecen en cero y el Impuesto Interno se informa directamente. El total del comprobante incorpora únicamente el Impuesto Interno y no vuelve a adicionar ICL ni IDC.
 
 ---
 
@@ -665,6 +669,18 @@ Las pruebas verifican además que la reconciliación utiliza exclusivamente GET.
 
 En el entorno integrado se validaron:
 
+- Factura A simple;
+- Factura A con múltiples artículos;
+- artículos repetidos;
+- artículos combustibles;
+- artículos no combustibles;
+- comprobantes mixtos;
+- actualización de stock;
+- actualización de precio de costo;
+- persistencia en PostgreSQL;
+- persistencia en WinDev;
+- registro en `apiOperacionesProcesadas`;
+- idempotencia;
 - alta sin integración;
 - actualización sólo de costo;
 - actualización sólo de stock;

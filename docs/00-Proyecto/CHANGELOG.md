@@ -33,7 +33,7 @@ Incluye:
 - eliminación de la confusión entre una caída del backend Node y un problema de Gestión Ventas;
 - manejo defensivo cuando falla la comprobación de disponibilidad o la reconciliación.
 
-La Etapa 2, `GET /api/status/windev`, permanece pendiente, requerirá un endpoint específico de estado en Gestión Ventas y no forma parte de esta versión.
+Al cierre inicial de la Etapa 1, `GET /api/status/windev` quedaba pendiente y requería un endpoint específico de estado en Gestión Ventas. Su implementación se completó posteriormente dentro de esta misma versión, como registra la entrada siguiente.
 
 ## Infraestructura de disponibilidad de servicios
 
@@ -66,7 +66,10 @@ La Etapa 2, `GET /api/status/windev`, permanece pendiente, requerirá un endpoin
 - Se habilitó la carga de múltiples líneas correspondientes al mismo artículo sin consolidarlas automáticamente.
 - Todas las líneas repetidas participan normalmente en cantidades, stock, impuestos y total del comprobante.
 - La actualización del precio de costo quedó como una decisión opcional del operador, limitada a cero o una línea por artículo.
+- Puede no existir ninguna línea marcada para actualizar el precio de costo.
 - La selección entre líneas repetidas se realiza de forma atómica: al marcar una línea válida se desmarca la anterior del mismo artículo.
+- Si se elimina la línea marcada, otra línea puede seleccionarse sin restricciones derivadas de la selección anterior.
+- El precio de costo se obtiene únicamente de la línea marcada.
 - Se incorporó protección contra precios no positivos y precios simbólicos que no superen el umbral funcional respecto del mayor precio positivo del artículo.
 - Se agregó una validación final defensiva antes del envío al backend para impedir selecciones de costo inválidas.
 - La selección de `Actualizar precio costo` permanece independiente del cálculo del comprobante y de la validación entre `Total Factura` y el total calculado.
@@ -74,11 +77,18 @@ La Etapa 2, `GET /api/status/windev`, permanece pendiente, requerirá un endpoin
 ### Impuestos Internos por artículo
 
 - Se incorporó el campo `es_combustible` al contrato de artículos.
+- `es_combustible` quedó establecido como única fuente válida de clasificación, sin inferencias basadas en ICL o IDC.
 - Se implementó el tratamiento tributario diferenciado para artículos combustibles y no combustibles.
-- En combustibles el Impuesto Interno se calcula como `ICL + IDC`.
-- En no combustibles el Impuesto Interno se ingresa directamente.
+- En combustibles, ICL e IDC son editables y el Impuesto Interno, de sólo lectura, se calcula como `ICL + IDC`.
+- En no combustibles, ICL e IDC permanecen en cero y el Impuesto Interno se ingresa directamente.
+- El total incorpora únicamente el Impuesto Interno; ICL e IDC se conservan como apertura informativa exigida por ARCA.
 - Se corrigió el cálculo de comprobantes mixtos.
 - Frontend y backend utilizan `es_combustible` como fuente oficial de clasificación.
+
+### Validación funcional
+
+- Se validaron Factura A simple, Factura A con múltiples artículos, artículos repetidos, combustibles, no combustibles y comprobantes mixtos.
+- Se validaron la actualización de stock y del precio de costo, la persistencia en PostgreSQL y WinDev, el registro en `apiOperacionesProcesadas` y la idempotencia.
 
 ## Consolidación del Frontend v1
 

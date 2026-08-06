@@ -52,6 +52,12 @@ Versión del módulo: Compras v1.1.0
 
 ✔ Consolidación estructural del Frontend v1
 
+✔ Soporte de múltiples líneas del mismo artículo y actualización única del precio de costo
+
+✔ Tratamiento tributario de artículos combustibles y no combustibles mediante `es_combustible`
+
+✔ Búsqueda de artículos por Código SES integrada en WinDev, Node y frontend
+
 La integración de comprobantes quedó completamente implementada y validada. `operacionID`, rollback transaccional, reconciliación y bloqueo operativo no forman parte del trabajo pendiente.
 
 Prioridad funcional vigente:
@@ -89,7 +95,7 @@ Estado
 
 Mejoras incrementales pendientes
 
-- Búsqueda de artículos por Código SES, endpoint WinDev y mensaje visual de error.
+- Mensaje visual específico de error en búsquedas de artículos.
 - Presentación de alícuota IVA 10,50 %.
 - Validación de motivo, numeración automática y cuenta corriente de NC/ND internas.
 - Sustitución del `window.confirm` del cambio de modo detallado/simplificado.
@@ -102,12 +108,6 @@ Validación
 
 - Build e inspección técnica completados.
 - Prueba interactiva completa de `SESConfirmDialog` pendiente a cargo del operador.
-
-Deuda técnica externa — WinDev
-
-- El mantenimiento de artículos debe garantizar `ICL + IDC = Impuesto Interno` cuando existe desglose.
-- Si ICL e IDC están vacíos o en cero, Impuesto Interno puede conservar un valor independiente.
-- SES Compras no clasifica combustibles: utiliza `ICL + IDC` cuando la suma es positiva y `imp_interno_monto` en caso contrario.
 
 ---
 
